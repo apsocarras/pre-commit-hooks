@@ -1,5 +1,9 @@
 """
-Tell interpreter to treat type hints as string literals. Improves forwards/backwards compatibility between python versions.
+Add `from __future__ import annotations` to `.py` files in your project.
+
+This statement tells the interpreter to treat type hints as string literals,
+improving forwards/backwards compatibility between python versions
+and simplifying some solutions for achieving type-safety.
 
 See: https://docs.astral.sh/ruff/rules/future-required-type-annotation/
 """
@@ -13,24 +17,40 @@ from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
+import click
+from typing_extensions import cast
+
 logger = logging.getLogger(__name__)
 
-PROJ_ROOT = Path(__file__).parent.parent
 
 FROM_FUTURE = "from __future__ import annotations"
 
 
-class WrongLineWarning(UserWarning):
+@lru_cache
+def ignore_set(gitignore: Path | None = None) -> set[str]:
     """
-    If present, `from __future__ import annotations` should be the very first import statement in a module.
-
-    The `ruff` linter settings configured in pyproject.toml will flag as an error if that import is on
-    a later line in the module.
+    Create set of dirs/path components for this script to ignore.
+    Includes all lines in the project's `.gitignore`, if provided.
     """
 
-    def __init__(self, mod: ast.Module, lineno: int, *args: object) -> None:
-        msg = f"`{FROM_FUTURE}` not the first non-docstring statement of module {mod} (line: {lineno})"
-        super().__init__(msg, *args)
+    ignore_dirs: set[str] = {
+        ".venv",
+        "libs",
+        "deprecated",
+        "_local",
+    }
+
+    if gitignore is None:
+        return ignore_dirs
+    if not gitignore.exists():
+        warnings.warn(f"{gitignore} not found")
+        return ignore_dirs
+
+    def _skip_line(l: str) -> bool:
+        return not (ls := l.strip()) or ls.startswith("#") or ls.startswith("!")
+
+    ignore_lines: set[str] = {l for l in gitignore.read_text() if not _skip_line(l)}
+    return ignore_lines | ignore_dirs
 
 
 class NodeLoc(NamedTuple):
@@ -38,21 +58,39 @@ class NodeLoc(NamedTuple):
     lineno: int
 
 
-def locate_first_import_statement(mod: ast.Module) -> NodeLoc | None:
+def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
+    """
+    Assumes:
+        - If present, `from __future__ import annotations` is the very first import statement in a module.
+        - Docstring is not preceded by any other lines.
+    """
+
+    # fmt: off
+    docstring_offset = (
+        0 
+        if not ast.get_docstring(mod)
+        else cast(int, mod.body[0].end_lineno)
+    )
+    # fmt: on
+
     for idx, node in enumerate(mod.body):
         if isinstance(node, ast.ImportFrom):
             if node.module == "__future__":
-                return None
+                return
             return NodeLoc(
                 idx,
-                node.lineno,
+                node.lineno + docstring_offset,
             )
-    return NodeLoc(0, 0)
+    idx = 0 if not ast.get_docstring(mod) else 1
+
+    return NodeLoc(idx, docstring_offset)
 
 
-def rewrite_file_with_future(src_code: str, path: Path, insertion_lineno: int) -> None:
+def rewrite_file_with_future(src_code: str, path: Path, loc: NodeLoc) -> None:
+    # Add preceding newline only if it's not the first node (i.e. if module has a docstring)
+    from_future = f"\n{FROM_FUTURE}\n" if loc.idx != 0 else f"{FROM_FUTURE}\n\n"
     lines = src_code.splitlines(keepends=True)
-    lines.insert(insertion_lineno, f"\n{FROM_FUTURE}\n")
+    lines.insert(loc.lineno, from_future)
     with path.open("w") as file:
         file.writelines(lines)
 
@@ -60,43 +98,31 @@ def rewrite_file_with_future(src_code: str, path: Path, insertion_lineno: int) -
 def add_statement(path: Path) -> Path | None:
     src_code = path.read_text(encoding="utf-8")
     mod = ast.parse(src_code, filename=str(path))
-    loc: NodeLoc | None = locate_first_import_statement(mod)
+    loc: NodeLoc | None = find_insertion_point(mod)
     if loc is None:
         return None
-    if loc.idx > 1:
-        warnings.warn(WrongLineWarning(mod, loc.lineno))
-    rewrite_file_with_future(src_code, path, loc.lineno)
+    rewrite_file_with_future(src_code, path, loc)
     return path
 
 
-IGNORE_DIRS: set[str] = {
-    ".venv",
-    "libs",
-    "deprecated",
-    "_local",
-}
+@click.command
+@click.argument("proj_root")
+@click.option("--ignore_by_gitignore", "-g", type=bool, default=False)
+def main(
+    proj_root: Path | str,
+    ignore_by_gitignore: bool = False,
+) -> None:
+    p = Path(proj_root)
 
+    gitignore: Path | None = p / ".gitignore" if ignore_by_gitignore else None
 
-@lru_cache
-def _ignore_set() -> set[str]:
-    def _skip_line(l: str) -> bool:
-        return not (ls := l.strip()) or ls.startswith("#") or ls.startswith("!")
+    def _in_ignore(p: Path) -> bool:
+        return any(part in ignore_set(gitignore) for part in p.parts)
 
-    if (gitignore := PROJ_ROOT / ".gitignore").exists():
-        ignore_lines: set[str] = {l for l in gitignore.read_text() if not _skip_line(l)}
-        return ignore_lines | IGNORE_DIRS
-    return IGNORE_DIRS
-
-
-def _in_ignore(p: Path) -> bool:
-    return any(part in _ignore_set() for part in p.parts)
-
-
-def main() -> None:
     # fmt: off
     added_files: tuple[str, ...] = tuple(
         added.name
-        for path in PROJ_ROOT.rglob("**/*.py")
+        for path in p.rglob("**/*.py")
         if not _in_ignore(path)
         if (added := add_statement(path))
     )
