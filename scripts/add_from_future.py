@@ -13,12 +13,12 @@ from __future__ import annotations
 import ast
 import logging
 import warnings
+from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Generator, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import click
-from typing_extensions import cast
 
 from scripts.utils.git_utils import iter_changed_py_files
 
@@ -26,21 +26,24 @@ logger = logging.getLogger(__name__)
 
 
 FROM_FUTURE = "from __future__ import annotations"
-
-
-@lru_cache
-def ignore_set(gitignore: Path | None = None) -> set[str]:
-    """
-    Create set of dirs/path components for this script to ignore.
-    Includes all lines in the project's `.gitignore`, if provided.
-    """
-
-    ignore_dirs: set[str] = {
+IGNORE_DIRS = frozenset[str](
+    {
         ".venv",
         "libs",
         "deprecated",
         "_local",
     }
+)
+
+
+@lru_cache
+def ignore_set(
+    ignore_dirs: frozenset[str] = IGNORE_DIRS, gitignore: Path | None = None
+) -> frozenset[str]:
+    """
+    Create set of dirs/path components for this script to ignore.
+    Includes all lines in the project's `.gitignore`, if provided.
+    """
 
     if gitignore is None:
         return ignore_dirs
@@ -51,7 +54,9 @@ def ignore_set(gitignore: Path | None = None) -> set[str]:
     def _skip_line(l: str) -> bool:
         return not (ls := l.strip()) or ls.startswith("#") or ls.startswith("!")
 
-    ignore_lines: set[str] = {l for l in gitignore.read_text() if not _skip_line(l)}
+    ignore_lines: frozenset[str] = frozenset(
+        {l for l in gitignore.read_text() if not _skip_line(l)}
+    )
     return ignore_lines | ignore_dirs
 
 
