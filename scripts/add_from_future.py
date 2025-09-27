@@ -107,7 +107,7 @@ def add_statement(path: Path) -> Path | None:
 
 @click.command
 @click.argument("proj_root")
-@click.option("--ignore_by_gitignore", "-g", type=bool, default=False)
+@click.option("--ignore_by_gitignore", "-g", is_flag=True)
 def main(
     proj_root: Path | str,
     ignore_by_gitignore: bool = False,
