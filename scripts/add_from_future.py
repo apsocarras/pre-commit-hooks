@@ -120,7 +120,7 @@ def iter_files(root: Path, diff_filter_staging: bool, gitignore: Path | None)  -
     
     def _core_iter() -> Generator[Path, Any, None]: 
         if diff_filter_staging:
-            yield from iter_changed_py_files(root) 
+            yield from iter_changed_py_files(root, staged=diff_filter_staging) 
         else:         
             yield from root.rglob("**/*.py") 
     
