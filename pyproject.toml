@@ -1,7 +1,12 @@
 [project]
 name = "pre-commit-hooks"
 version = "0.1.0"
-description = "Add your description here"
+description = "Consolidating the pre-commit hooks I use into this git submodule."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+]
