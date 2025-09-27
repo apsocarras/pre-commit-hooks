@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 import logging
 import warnings
+from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -76,8 +77,19 @@ IGNORE_DIRS: set[str] = {
 }
 
 
-def _in_ignore(p: Path):
-    return any(part in IGNORE_DIRS for part in p.parts)
+@lru_cache
+def _ignore_set() -> set[str]:
+    def _skip_line(l: str) -> bool:
+        return not (ls := l.strip()) or ls.startswith("#") or ls.startswith("!")
+
+    if (gitignore := PROJ_ROOT / ".gitignore").exists():
+        ignore_lines: set[str] = {l for l in gitignore.read_text() if not _skip_line(l)}
+        return ignore_lines | IGNORE_DIRS
+    return IGNORE_DIRS
+
+
+def _in_ignore(p: Path) -> bool:
+    return any(part in _ignore_set() for part in p.parts)
 
 
 def main() -> None:
