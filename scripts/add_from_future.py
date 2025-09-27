@@ -6,8 +6,6 @@ improving forwards/backwards compatibility between python versions
 and simplifying some solutions for achieving type-safety.
 
 See: https://docs.astral.sh/ruff/rules/future-required-type-annotation/.
-
-This pre-commit hook is configured to only search your .git staging area for changed .py files
 """
 
 from __future__ import annotations
@@ -109,6 +107,27 @@ def add_statement(path: Path) -> Path | None:
     return path
 
 
+# fmt: off
+def iter_files(root: Path, diff_filter_staging: bool, gitignore: Path | None)  -> Generator[Path, Any, None]:
+    """
+    - If diff_filter_staging, only iterates over changed .py files in the staging area of .git
+    - Else, iterates over all globbed .py files
+        - Ignores anything in .venv, libs, deprecated, or _local (folders I commonly use)
+        - (Optionally) ignores paths intersecting with anything in .gitignore
+    """
+    def _in_ignore_set(p: Path) -> bool:
+        return any(part in ignore_set(gitignore) for part in p.parts)
+    
+    def _core_iter() -> Generator[Path, Any, None]: 
+        if diff_filter_staging:
+            yield from iter_changed_py_files(root) 
+        else:         
+            yield from root.rglob("**/*.py") 
+    
+    yield from (p for p in _core_iter() if not _in_ignore_set(p))
+# fmt: on
+
+
 @click.command
 @click.argument("proj_root")
 @click.option("--ignore_by_gitignore", "-g", is_flag=True)
@@ -122,20 +141,10 @@ def main(
 
     gitignore: Path | None = root / ".gitignore" if ignore_by_gitignore else None
 
-    def _in_ignore(p: Path) -> bool:
-        return any(part in ignore_set(gitignore) for part in p.parts)
-
-    def _iter() -> Generator[Path, Any, None]:
-        if diff_filter_staging:
-            yield from iter_changed_py_files(root)
-        else:
-            yield from root.rglob("**/*.py")
-
     # fmt: off
     added_files: tuple[str, ...] = tuple(
         added.name
-        for p in _iter()
-        if not _in_ignore(p)
+        for p in iter_files(root, diff_filter_staging, gitignore)
         if (added := add_statement(p))
     )
     # fmt: on
