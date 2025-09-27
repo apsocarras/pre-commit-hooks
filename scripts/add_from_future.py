@@ -55,6 +55,27 @@ def ignore_set(gitignore: Path | None = None) -> set[str]:
     return ignore_lines | ignore_dirs
 
 
+# fmt: off
+def iter_files(root: Path, diff_filter_staging: bool, gitignore: Path | None)  -> Generator[Path, Any, None]:
+    """
+    - If diff_filter_staging, only iterates over changed .py files in the staging area of .git
+    - Else, iterates over all globbed .py files
+        - Ignores anything in .venv, libs, deprecated, or _local (folders I commonly use)
+        - (Optionally) ignores paths intersecting with anything in .gitignore
+    """
+    def _in_ignore_set(p: Path) -> bool:
+        return any(part in ignore_set(gitignore) for part in p.parts)
+    
+    def _core_iter() -> Generator[Path, Any, None]: 
+        if diff_filter_staging:
+            yield from iter_changed_py_files(root, staged=diff_filter_staging) 
+        else:         
+            yield from root.rglob("**/*.py") 
+    
+    yield from (p for p in _core_iter() if not _in_ignore_set(p))
+# fmt: on
+
+
 class NodeLoc(NamedTuple):
     idx: int
     lineno: int
@@ -105,27 +126,6 @@ def add_statement(path: Path) -> Path | None:
         return None
     rewrite_file_with_future(src_code, path, loc)
     return path
-
-
-# fmt: off
-def iter_files(root: Path, diff_filter_staging: bool, gitignore: Path | None)  -> Generator[Path, Any, None]:
-    """
-    - If diff_filter_staging, only iterates over changed .py files in the staging area of .git
-    - Else, iterates over all globbed .py files
-        - Ignores anything in .venv, libs, deprecated, or _local (folders I commonly use)
-        - (Optionally) ignores paths intersecting with anything in .gitignore
-    """
-    def _in_ignore_set(p: Path) -> bool:
-        return any(part in ignore_set(gitignore) for part in p.parts)
-    
-    def _core_iter() -> Generator[Path, Any, None]: 
-        if diff_filter_staging:
-            yield from iter_changed_py_files(root, staged=diff_filter_staging) 
-        else:         
-            yield from root.rglob("**/*.py") 
-    
-    yield from (p for p in _core_iter() if not _in_ignore_set(p))
-# fmt: on
 
 
 @click.command
