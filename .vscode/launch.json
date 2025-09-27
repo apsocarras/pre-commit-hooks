@@ -54,7 +54,7 @@
             }
         },
         {
-        "name": "Pytest: Run add_from_future.py",
+        "name": "Python: Run add_from_future.py",
         "type": "debugpy",
         "request": "launch",
         "program": "scripts/add_from_future.py",
@@ -65,5 +65,15 @@
         "justMyCode": true, 
         },
 
+        {
+        "name": "Python: Run emit_requirements.py",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "scripts/emit_requirements.py",
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env",
+        "justMyCode": true, 
+        },
     ]
 }
