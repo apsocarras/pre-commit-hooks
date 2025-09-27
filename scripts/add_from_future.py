@@ -5,7 +5,9 @@ This statement tells the interpreter to treat type hints as string literals,
 improving forwards/backwards compatibility between python versions
 and simplifying some solutions for achieving type-safety.
 
-See: https://docs.astral.sh/ruff/rules/future-required-type-annotation/
+See: https://docs.astral.sh/ruff/rules/future-required-type-annotation/.
+
+This pre-commit hook is configured to only search your .git staging area for changed .py files
 """
 
 from __future__ import annotations
@@ -15,10 +17,12 @@ import logging
 import warnings
 from functools import lru_cache
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, Generator, NamedTuple
 
 import click
 from typing_extensions import cast
+
+from scripts.utils.git_utils import iter_changed_py_files
 
 logger = logging.getLogger(__name__)
 
@@ -108,23 +112,31 @@ def add_statement(path: Path) -> Path | None:
 @click.command
 @click.argument("proj_root")
 @click.option("--ignore_by_gitignore", "-g", is_flag=True)
+@click.option("--diff-filter-staging", "-ds", is_flag=True)
 def main(
     proj_root: Path | str,
     ignore_by_gitignore: bool = False,
+    diff_filter_staging: bool = True,
 ) -> None:
-    p = Path(proj_root)
+    root = Path(proj_root)
 
-    gitignore: Path | None = p / ".gitignore" if ignore_by_gitignore else None
+    gitignore: Path | None = root / ".gitignore" if ignore_by_gitignore else None
 
     def _in_ignore(p: Path) -> bool:
         return any(part in ignore_set(gitignore) for part in p.parts)
 
+    def _iter() -> Generator[Path, Any, None]:
+        if diff_filter_staging:
+            yield from iter_changed_py_files(root)
+        else:
+            yield from root.rglob("**/*.py")
+
     # fmt: off
     added_files: tuple[str, ...] = tuple(
         added.name
-        for path in p.rglob("**/*.py")
-        if not _in_ignore(path)
-        if (added := add_statement(path))
+        for p in _iter()
+        if not _in_ignore(p)
+        if (added := add_statement(p))
     )
     # fmt: on
     if added_files:
