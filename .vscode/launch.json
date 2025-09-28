@@ -75,5 +75,17 @@
         "envFile": "${workspaceFolder}/.env",
         "justMyCode": true, 
         },
+
+        {
+        "name": "Python: Run env_skeleton.py",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "scripts/env_skeleton.py",
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "args": [".env", ".example-env"],
+        "envFile": "${workspaceFolder}/.env",
+        "justMyCode": true, 
+        },
     ]
 }
