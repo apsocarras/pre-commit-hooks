@@ -5,7 +5,8 @@ This statement tells the interpreter to treat type hints as string literals,
 improving forwards/backwards compatibility between python versions
 and simplifying some solutions for achieving type-safety.
 
-See: https://docs.astral.sh/ruff/rules/future-required-type-annotation/.
+- Most packages which rely on type introspection (e.g. Pydantic) will support this by now
+- Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
 """
 
 from __future__ import annotations
