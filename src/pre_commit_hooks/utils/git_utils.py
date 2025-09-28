@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal, overload
 
 from typing_extensions import LiteralString, override
 
@@ -15,6 +16,7 @@ def run_git(cwd: Path, *args: str) -> str:
     return res.stdout
 
 
+@lru_cache
 def find_repo_root(start: Path) -> Path:
     """Find the .git repo root from a starting directory"""
     try:
@@ -69,8 +71,10 @@ def iter_changed_py_files(
             Absolute paths to `.py` files matching your filter criteria.
     """
 
+    repo_root: Path = find_repo_root(root)
+
     def _cmd(*args: str):
-        return run_git(root, "diff", "--name-only", str(diff_filter), *args)
+        return run_git(repo_root, "diff", "--name-only", str(diff_filter), *args)
 
     if base:
         args = ("--cached", base) if staged else (base,)
@@ -89,3 +93,46 @@ def iter_changed_py_files(
         and (p := (root / rel).resolve()).exists():
             yield p
     # fmt: on
+
+
+# fmt: off
+def _non_ignore(l: str) -> bool: 
+    return not (ls := l.strip()) \
+        or ls.startswith("#") \
+        or ls.startswith("!")
+# fmt: on
+
+
+def iter_gitignore(
+    path: Path | str, line_skip: Callable[[str], bool] = _non_ignore
+) -> Iterable[str]:
+    with open(path, "r") as file:
+        for line in iter(file.readline, ""):
+            if not line_skip(line):
+                yield line
+
+
+# fmt: off
+@overload
+def check_ignored(
+    root: Path,
+    path: Path,
+) -> bool: ...
+@overload
+def check_ignored(
+    root: Path, 
+    path: None, 
+    *paths: Path
+) -> dict[Path, bool]: ...
+def check_ignored(
+    root: Path, path: Path | None = None, *paths: Path
+) -> bool | dict[Path, bool]:
+# fmt: on
+    start = find_repo_root(root)
+    if path:
+        result = run_git(start, "check-ignore", str(path))
+        return path.name in result
+
+    result = run_git(start, "check-ignore", *(str(p.resolve()) for p in paths))
+    ignored_set = {Path(r) for r in result.splitlines()}
+    return {p: (p in ignored_set) for p in paths}

@@ -21,7 +21,7 @@ from typing import Any, NamedTuple, cast
 
 import click
 
-from scripts.utils.git_utils import iter_changed_py_files
+from .utils.git_utils import iter_changed_py_files, iter_gitignore
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,7 @@ def ignore_set(
         warnings.warn(f"{gitignore} not found")
         return ignore_dirs
 
-    def _skip_line(l: str) -> bool:
-        return not (ls := l.strip()) or ls.startswith("#") or ls.startswith("!")
-
-    ignore_lines: frozenset[str] = frozenset(
-        {l for l in gitignore.read_text() if not _skip_line(l)}
-    )
+    ignore_lines: frozenset[str] = frozenset(iter_gitignore(gitignore))
     return ignore_lines | ignore_dirs
 
 
