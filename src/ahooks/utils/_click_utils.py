@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Callable
 
 import click
 
@@ -64,11 +63,10 @@ def stage_if_true(
     cond: bool,
     /,
     hook_name: str,
-    stage_msg: Callable[[str, Path | str], str] = _stage_msg,
     *paths: Path,
 ) -> None:
     if cond:
         git_add(*paths)
-        click.echo(stage_msg(hook_name, *paths))
+        click.echo(_stage_msg(hook_name, *paths))
     else:
         click.echo(f"[{hook_name}] All up to date")
