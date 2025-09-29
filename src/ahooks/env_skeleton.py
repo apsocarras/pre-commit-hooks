@@ -14,14 +14,14 @@ from typing import Callable
 
 import click
 
-from ahooks.utils._preCommitConfigBlock import PreCommitConfigBlock as cb
-from ahooks.utils.click_utils import (
+from ahooks.utils._click_utils import (
     READ_DIR_TYPE,
     READ_FILE_TYPE,
     WRITE_DIR_TYPE,
 )
+from ahooks.utils.preCommitConfigBlock import PreCommitConfigBlock as cb
 
-from .utils.file_utils import write_, write_if_changed
+from .utils._file_utils import write_, write_if_changed
 from .utils.git_utils import check_ignored, find_repo_root, git_add
 
 

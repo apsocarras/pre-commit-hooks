@@ -1,3 +1,6 @@
+# ruff: noqa: S603
+"""Wrap Git operations in python"""
+
 from __future__ import annotations
 
 import subprocess
@@ -5,7 +8,7 @@ import warnings
 from collections.abc import Collection, Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Callable, Literal, TypeVar, Union, cast
+from typing import Annotated, Any, Callable, Literal, TypeVar, Union, cast
 
 from typing_extensions import LiteralString, Self, TypeAlias, override
 
@@ -16,14 +19,40 @@ Ignores: TypeAlias = Annotated[
 PathLike = Union[str, Path]
 
 
+class GitSubProcessFailed(Exception):
+    """Failed to run a Git subprocess"""
+
+    def __init__(
+        self,
+        cmd_args: Collection[str],
+        res: subprocess.CompletedProcess[str],
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize a GitSubProcessFailed error.
+
+        Args:
+            cmd_args: The list of git command arguments that were executed.
+            res: The CompletedProcess object returned by subprocess.run,
+                 containing stdout, stderr, and return code.
+            *args: Additional positional arguments passed to Exception.
+            **kwargs: Additional keyword arguments passed to Exception.
+        """
+        msg = f"git {' '.join(cmd_args)} failed:\n{res.stderr.strip()}"
+        super().__init__(msg, *args, **kwargs)
+
+
 def run_git(cwd: Path, *args: str) -> str:
+    """Main runner for git commands"""
     res = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
     if res.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)} failed:\n{res.stderr.strip()}")
+        raise GitSubProcessFailed(args, res)
     return res.stdout
 
 
 def git_add(path: Path) -> None:
+    """...Add it to git."""
     _ = subprocess.run(
         ("git", "add", "--", str(path)),
         check=False,
@@ -46,7 +75,15 @@ DiffFilterType = Literal["A", "C", "M", "R", "T", "U", "X", "B", "D"]
 
 
 class DiffFilter:
+    """Class Wrapper for `--diff-filter` arguments"""
+
     def __init__(self, *args: DiffFilterType) -> None:
+        """Initialize DiffFilter instance
+
+        Arguments:
+            *args : DiffFilterType
+            Collection of argument flags: "A", "C", "M", "R", "T", "U", "X", "B", "D"
+        """
         self._cmd: LiteralString = f"--diff-filter={''.join(args)}"
 
     @override
@@ -59,7 +96,8 @@ IGNORE_DELETE = DiffFilter("A", "C", "M", "R", "T", "U", "X", "B")
 
 @lru_cache
 def ignore_set(ignores: Ignores, gitignore: Path | None = None) -> frozenset[Path]:
-    """Create set of dirs or file paths to ignore.
+    """
+    Create set of dirs or file paths to ignore.
 
     - Can be used to ignore artbitrary files independent of your `.git` repo structure.
     - Includes all lines in the `.gitignore`, if provided.
@@ -114,7 +152,8 @@ def iter_py_git_diff(
     base: str | None = None,
     diff_filter: DiffFilter = IGNORE_DELETE,
 ) -> Iterable[Path]:
-    """Iterate over changed `.py` files per specified Git filters.
+    """
+    Iterate over changed `.py` files per specified Git filters.
 
     Arguments:
         root : Path Path to the Git repository root (or any path within it).
@@ -160,7 +199,8 @@ def iter_py_git_diff(
 def iter_py_filtered(
     root: Path, diff_filter_staging: bool, gitignore: Path | None, ignores: Ignores
 ) -> Iterable[Path]:
-    """Iterate over Python source files under a project root with optional filtering.
+    """
+    Iterate over Python source files under a project root with optional filtering.
 
     Args:
         root (Path): Root directory of the project.
@@ -197,6 +237,7 @@ def _non_ignore(l: str) -> bool:
 def iter_gitignore(
     path: Path | str, line_skip: Callable[[str], bool] = _non_ignore
 ) -> Iterable[str]:
+    """Iterate over the lines in a .gitignore file with an optional filter view"""
     with open(path) as file:
         for line in iter(file.readline, ""):
             if not line_skip(line):
@@ -206,11 +247,33 @@ def iter_gitignore(
 T = TypeVar("T", str, Path)
 
 
-# fmt: off
-def check_ignored(
-    root: Path, ignore: T | Collection[T]
-) -> set[T]:
-# fmt: on
+def check_ignored(root: Path, ignore: T | Collection[T]) -> set[T]:
+    """
+    Check whether given paths are ignored by Git.
+
+    This function wraps `git check-ignore` and reports which of the provided
+    paths are ignored according to the `.gitignore` configuration starting
+    from the repository root.
+
+    Args:
+        root : Path
+        Any path inside the target Git repository. Used to resolve repo root.
+        ignore : Path | str | Collection[Path] | Collection[str]
+        A single path-like (``Path`` or ``str``) or a collection of
+        such objects to check against Git's ignore rules.
+
+    Returns:
+        A set of the paths from ``ignore`` that are matched by Git's ignore
+        configuration. If a single path was passed and is ignored, the set
+        will contain that single element; otherwise an empty set is returned.
+
+    Example:
+    ```pycon
+    >>> check_ignored(Path("."), "node_modules/")
+    {"node_modules/"}
+    ```
+
+    """
     start = find_repo_root(root)
     if isinstance(ignore, (Path, str)):
         result = run_git(start, "check-ignore", str(ignore))
