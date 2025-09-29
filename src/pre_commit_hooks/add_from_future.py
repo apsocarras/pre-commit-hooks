@@ -1,32 +1,26 @@
-"""
-Add `from __future__ import annotations` to `.py` files in your project.
-
-This statement tells the interpreter to treat type hints as string literals,
-improving forwards/backwards compatibility between python versions
-and simplifying some solutions for achieving type-safety.
-
-- Most packages which rely on type introspection (e.g. Pydantic) will support this by now
-- Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
-"""
-
 from __future__ import annotations
 
 import ast
 import logging
-import warnings
-from collections.abc import Generator
-from functools import lru_cache
+from collections.abc import Collection
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import NamedTuple, cast
 
 import click
 
-from .utils.git_utils import iter_changed_py_files, iter_gitignore
+from pre_commit_hooks.utils import PreCommitConfigBlock as cb
+from pre_commit_hooks.utils.click_utils import READ_DIR_TYPE
+
+from .utils.git_utils import (
+    iter_py_filtered,
+)
 
 logger = logging.getLogger(__name__)
 
 
 FROM_FUTURE = "from __future__ import annotations"
+
+
 IGNORE_DIRS = frozenset[str](
     {
         ".venv",
@@ -35,46 +29,6 @@ IGNORE_DIRS = frozenset[str](
         "_local",
     }
 )
-
-
-@lru_cache
-def ignore_set(
-    ignore_dirs: frozenset[str] = IGNORE_DIRS, gitignore: Path | None = None
-) -> frozenset[str]:
-    """
-    Create set of dirs/path components for this script to ignore.
-    Includes all lines in the project's `.gitignore`, if provided.
-    """
-
-    if gitignore is None:
-        return ignore_dirs
-    if not gitignore.exists():
-        warnings.warn(f"{gitignore} not found")
-        return ignore_dirs
-
-    ignore_lines: frozenset[str] = frozenset(iter_gitignore(gitignore))
-    return ignore_lines | ignore_dirs
-
-
-# fmt: off
-def iter_files(root: Path, diff_filter_staging: bool, gitignore: Path | None)  -> Generator[Path, Any, None]:
-    """
-    - If diff_filter_staging, only iterates over changed .py files in the staging area of .git
-    - Else, iterates over all globbed .py files
-        - Ignores anything in .venv, libs, deprecated, or _local (folders I commonly use)
-        - (Optionally) ignores paths intersecting with anything in .gitignore
-    """
-    def _in_ignore_set(p: Path) -> bool:
-        return any(part in ignore_set(gitignore) for part in p.parts)
-    
-    def _core_iter() -> Generator[Path, Any, None]: 
-        if diff_filter_staging:
-            yield from iter_changed_py_files(root, staged=diff_filter_staging) 
-        else:         
-            yield from root.rglob("**/*.py") 
-    
-    yield from (p for p in _core_iter() if not _in_ignore_set(p))
-# fmt: on
 
 
 class NodeLoc(NamedTuple):
@@ -130,14 +84,49 @@ def add_statement(path: Path) -> Path | None:
 
 
 @click.command
-@click.argument("proj_root")
-@click.option("--ignore_by_gitignore", "-g", is_flag=True)
+@click.argument("proj_root", type=READ_DIR_TYPE, default=Path.cwd())
+@click.argument("ignores", nargs=-1, type=READ_DIR_TYPE)
 @click.option("--diff-filter-staging", "-ds", is_flag=True)
+@click.option("--ignore_by_gitignore", "-g", is_flag=True)
+@cb(
+    id="add-from-future",
+    name="Add `from __future__ import annotations` to `.py` files.",
+    language="python",
+    entry="python -m ahooks.add_from_future",
+    pass_filenames=False,
+    stages=["pre-commit"],
+    args=["-ds"],
+    files=r"^.*\.py$",
+)
 def main(
-    proj_root: Path | str,
-    ignore_by_gitignore: bool = False,
+    proj_root: Path,
+    ignores: Collection[Path] = (),
     diff_filter_staging: bool = True,
+    ignore_by_gitignore: bool = False,
 ) -> None:
+    """Add `from __future__ import annotations` to `.py` files.
+
+    This statement tells the interpreter to treat type hints as string literals,
+    improving forwards/backwards compatibility between python versions
+    and simplifying some solutions for achieving type-safety.
+
+    - Most packages which rely on type introspection (e.g. Pydantic) will support this by now
+    - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
+
+    Arguments:
+        proj_root : Path
+            Path to the Git repository root (or any path within it).
+        diff_filter_staging : bool, default=True
+            If true, only scan/modify .py files in your .git staging area.
+        ignore_by_gitignore : bool, default=False
+            Alternative filter which reads files/directories mentioned in your .gitignore
+            and excludes any files intersecting with these. Redundant with ``diff_filter_staging``.
+        ignores : Ignores -> Collection[str]
+            Collection of directory names relative to your project root.
+            - Can use as a fallback in case you meant to ignore something in .gitignore but it's not in there.
+            - Can also use to ignore files independently of your Git rules.
+    """
+
     root = Path(proj_root)
 
     gitignore: Path | None = root / ".gitignore" if ignore_by_gitignore else None
@@ -145,7 +134,7 @@ def main(
     # fmt: off
     added_files: tuple[str, ...] = tuple(
         added.name
-        for p in iter_files(root, diff_filter_staging, gitignore)
+        for p in iter_py_filtered(root, diff_filter_staging, gitignore, ignores)
         if (added := add_statement(p))
     )
     # fmt: on

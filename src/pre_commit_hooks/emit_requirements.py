@@ -1,10 +1,4 @@
-"""
-Emit `requirements.txt` from a `pyproject.toml` using `uv`
-
-If the `pyproject.toml` has a `test` group, it includes it.
-    - The only real purpose of emitting requirements.txt is for
-    cloud deployment, which is usually in CI/CD pipelines.
-"""
+# pyright: reportInvalidStringEscapeSequence=false
 
 from __future__ import annotations
 
@@ -19,6 +13,8 @@ from typing import Any, Literal
 
 import click
 import tomli
+
+from pre_commit_hooks.utils import PreCommitConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +49,41 @@ def construct_command(dep_type: TestDepsType | None) -> list[str]:
 
 
 @click.command
+@cb(
+    id="block-manual-req-edits",
+    name="Block manual edits to requirements.txt",
+    ## TODO: Ideally, for portability reasons,  I would provide another script in this python package
+    # to handle this pre-filter. But anyone can modify the default pre-config blocks after they're output.
+    entry="""
+     bash -c 
+            if git diff --cached --name-only | grep -q "^requirements\.txt$" && 
+                ! git diff --cached --name-only | grep -q "^pyproject\.toml$"; then
+                echo "Edit pyproject.toml and run the emitter; don't hand-edit requirements.txt."
+                exit 1
+            fi
+    """,
+    language="system",
+    pass_filenames=False,
+    files=r"^requirements\.txt$",
+    stages=("pre-commit", "pre-push"),
+)
+@cb(
+    id="emit-requirements",
+    name="Emit requirements.txt from pyproject.toml using `uv`",
+    entry="python -m ahooks.emit_requirements",
+    language="system",
+    pass_filenames=False,
+    files=r"^(pyproject\.toml|requirements\.txt)$",
+    stages=("pre-commit", "pre-push"),
+)
 def main():
+    """
+    Emit `requirements.txt` from a `pyproject.toml` using `uv`
+
+    If the `pyproject.toml` has a `test` group, it includes it.
+        - The only real purpose of emitting requirements.txt is for
+        cloud deployment, which is usually in CI/CD pipelines.
+    """
     if not shutil.which("uv"):
         warnings.warn("You must install `uv` to run this hook.")
         sys.exit(1)
