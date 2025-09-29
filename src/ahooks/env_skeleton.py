@@ -18,11 +18,12 @@ from ahooks.utils._click_utils import (
     READ_DIR_TYPE,
     READ_FILE_TYPE,
     WRITE_DIR_TYPE,
+    stage_if_true,
 )
 from ahooks.utils.preCommitConfigBlock import PreCommitConfigBlock as cb
 
 from .utils._file_utils import write_, write_if_changed
-from .utils.git_utils import check_ignored, find_repo_root, git_add
+from .utils.git_utils import check_ignored, find_repo_root
 
 
 def raise_if_git_ignored(git_root: Path, skelenv_path: Path) -> None:
@@ -94,11 +95,7 @@ def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
     raise_if_git_ignored(git_root, skelenv_path)
     content = build_skeleton(base_env_path)
     changed = write_if_changed(base_env_path, content)
-    if changed:
-        git_add(skelenv_path)
-        click.echo(f"[env-skeleton] Updated and staged: {skelenv_path}")
-    else:
-        click.echo(f"[env-skeleton] Up to date: {skelenv_path}")
+    stage_if_true(changed, "env-skeleton", skelenv_path)
 
 
 if __name__ == "__main__":
