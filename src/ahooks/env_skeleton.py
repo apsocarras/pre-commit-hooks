@@ -1,3 +1,8 @@
+"""Create an example `.env` file with only the names of variables.
+
+Keeps a Git-safe record of what .env vars you may set for the project.
+"""
+
 from __future__ import annotations
 
 import io
