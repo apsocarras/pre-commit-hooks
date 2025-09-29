@@ -5,10 +5,12 @@ from typing import Protocol
 
 
 class HasWrite(Protocol):
+    """Proto for files or buffer"""
+
     def write(self, s: str, /) -> int: ...
 
 
-def write_(f: HasWrite, s: str) -> None:  # wrapper to placate pyright
+def write_(f: HasWrite, s: str) -> None:
     """Write wrapper to placate pyright"""
     f.write(s)  # pyright: ignore[reportUnusedCallResult]
 

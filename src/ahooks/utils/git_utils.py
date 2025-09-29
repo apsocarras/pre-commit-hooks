@@ -27,8 +27,7 @@ def git_add(path: Path) -> None:
     _ = subprocess.run(
         ("git", "add", "--", str(path)),
         check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
 
 
@@ -76,11 +75,11 @@ def ignore_set(ignores: Ignores, gitignore: Path | None = None) -> frozenset[Pat
         return _normalize(ignores)
 
     if not gitignore.exists():
-        warnings.warn(f"{gitignore} not found")
+        warnings.warn(f"{gitignore} not found", stacklevel=2)
         return _normalize(ignores)
 
     ignore_lines: frozenset[Path] = frozenset(
-        (Path(l) for l in iter_gitignore(gitignore))
+        Path(l) for l in iter_gitignore(gitignore)
     )
     return ignore_lines | _normalize(ignores)
 
@@ -96,6 +95,7 @@ def in_ignore_set(
 class IgnoreSet(frozenset[Path]):
     """Class API for `ignore_set`"""
 
+    @override
     def __new__(cls, ignores: Ignores, gitignore: Path | None = None) -> Self:
         return super().__new__(cls, ignore_set(tuple(ignores), gitignore))
 
@@ -126,12 +126,13 @@ def iter_py_git_diff(
             A Git ref or commit to compare against (e.g. "origin/main").
             * staged=True  → `git diff --cached base`
             * staged=False → `git diff base`
+        diff_filter : DiffFilter, default=IGNORE_DELETE,
+
 
     Returns:
         Iterable[Path] :
             Absolute paths to `.py` files matching your diff-filter criteria.
     """
-
     repo_root: Path = find_repo_root(root)
 
     def _cmd(*args: str):
@@ -160,6 +161,7 @@ def iter_py_filtered(
     root: Path, diff_filter_staging: bool, gitignore: Path | None, ignores: Ignores
 ) -> Iterable[Path]:
     """Iterate over Python source files under a project root with optional filtering.
+
     Args:
         root (Path): Root directory of the project.
         diff_filter_staging (bool):
@@ -185,7 +187,7 @@ def iter_py_filtered(
 
 
 # fmt: off
-def _non_ignore(l: str) -> bool: 
+def _non_ignore(l: str) -> bool:
     return not (ls := l.strip()) \
         or ls.startswith("#") \
         or ls.startswith("!")
@@ -195,7 +197,7 @@ def _non_ignore(l: str) -> bool:
 def iter_gitignore(
     path: Path | str, line_skip: Callable[[str], bool] = _non_ignore
 ) -> Iterable[str]:
-    with open(path, "r") as file:
+    with open(path) as file:
         for line in iter(file.readline, ""):
             if not line_skip(line):
                 yield line
@@ -210,12 +212,12 @@ def check_ignored(
 ) -> set[T]:
 # fmt: on
     start = find_repo_root(root)
-    if isinstance(ignore, Path) or isinstance(ignore, str):
+    if isinstance(ignore, (Path, str)):
         result = run_git(start, "check-ignore", str(ignore))
-        if str(ignore) in result: 
-            return {cast(T, ignore)} 
+        if str(ignore) in result:
+            return {cast(T, ignore)}
         return set()
-    else: 
+    else:
         result = run_git(start, "check-ignore", *(str(r) for r in ignore))
         cls_ = next(iter(ignore)).__class__
         result_set = {cls_(r) for r in result.splitlines()}
