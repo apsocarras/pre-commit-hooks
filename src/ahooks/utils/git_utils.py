@@ -23,6 +23,15 @@ def run_git(cwd: Path, *args: str) -> str:
     return res.stdout
 
 
+def git_add(path: Path) -> None:
+    _ = subprocess.run(
+        ("git", "add", "--", str(path)),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
 @lru_cache
 def find_repo_root(start: Path) -> Path:
     """Find the .git repo root from a starting directory"""
