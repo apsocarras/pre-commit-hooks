@@ -51,10 +51,10 @@ def run_git(cwd: Path, *args: str) -> str:
     return res.stdout
 
 
-def git_add(path: Path) -> None:
+def git_add(*path: Path) -> None:
     """...Add it to git."""
     _ = subprocess.run(
-        ("git", "add", "--", str(path)),
+        ("git", "add", "--", " ".join(str(p) for p in path)),
         check=False,
         capture_output=True,
     )

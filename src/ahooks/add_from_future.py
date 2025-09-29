@@ -21,7 +21,7 @@ from typing import NamedTuple, cast
 import click
 
 from .utils import PreCommitConfigBlock as cb
-from .utils._click_utils import READ_DIR_TYPE
+from .utils._click_utils import READ_DIR_TYPE, stage_if_true
 from .utils.git_utils import (
     iter_py_filtered,
 )
@@ -150,14 +150,10 @@ def main(
         if (added := _add_statement(p))
     )
     # fmt: on
-    if added_files:
-        click.echo(
-            f"[add_from_future] Added {FROM_FUTURE} to {len(added_files)} files: {added_files}"
-        )
-    else:
-        click.echo(
-            f"[add_from_future] Added {FROM_FUTURE} to {len(added_files)} files: {added_files}"
-        )
+    stage_if_true(
+        len(added_files) > 0,
+        "add-from-future",
+    )
 
 
 if __name__ == "__main__":
