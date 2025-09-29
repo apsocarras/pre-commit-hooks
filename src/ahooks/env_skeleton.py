@@ -1,9 +1,11 @@
+# ruff: noqa: E731
 import warnings
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import click
+
 from ahooks.utils._preCommitConfigBlock import PreCommitConfigBlock as cb
 from ahooks.utils.click_utils import (
     READ_DIR_TYPE,
@@ -20,14 +22,22 @@ def warn_if_git_ignored(git_root: Path, skelenv_path: Path) -> None:
         warnings.warn(f"{skelenv_path} is ignored.")
 
 
-def iter_env_var_names(p: Path, include_eq_sign: bool = True) -> Iterable[str]:
+def iter_env_var_names(
+    p: Path, include_eq_sign: bool = True, strip_export: bool = True
+) -> Iterable[str]:
     offset = 0 if not include_eq_sign else 1
+
+    if strip_export:
+        _final: Callable[[str], str] = lambda s: s.removeprefix("export ")
+    else:
+        _final = lambda s: s
+
     for l in p.read_text().splitlines():
         if not (ls := l.strip()) or ls.startswith("#"):
             continue
         if (idx := l.find("=")) == -1:
             continue
-        yield l[: idx + offset]
+        yield _final(ls)[: idx + offset]
 
 
 @click.command
@@ -56,7 +66,7 @@ def main(git_repo_root: Path, base_env_path: Path, skelenv_path: Path) -> None:
         def write_(d: Any) -> None:  # wrapper to placate pyright
             file.write(d)  # pyright: ignore[reportUnusedCallResult, reportAny]
 
-        for var in iter_env_var_names(base_env_path):
+        for var in sorted(iter_env_var_names(base_env_path)):
             write_(var)
             write_("\n")
 
