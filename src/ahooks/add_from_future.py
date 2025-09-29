@@ -1,4 +1,4 @@
-"""Add `from __future__ import annotations` to `.py` files.
+r"""Add `from __future__ import annotations` to `.py` files.
 
 This statement tells the interpreter to treat type hints as string literals,
 improving forwards/backwards compatibility between python versions
@@ -8,12 +8,13 @@ and simplifying some solutions for achieving type-safety.
     - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
     - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
         https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
+    - Note the custom filtering I wrote is superfluous with `files=r"^.*\.py$"` and `pass filenames`
+     (why did I write this...though this does let you run it as a CLI independent of pre-commit)
 """
 
 from __future__ import annotations
 
 import ast
-import logging
 from collections.abc import Collection
 from pathlib import Path
 from typing import NamedTuple, cast
@@ -25,9 +26,6 @@ from .utils._click_utils import READ_DIR_TYPE, stage_if_true
 from .utils.git_utils import (
     iter_py_filtered,
 )
-
-logger = logging.getLogger(__name__)
-
 
 FROM_FUTURE = "from __future__ import annotations"
 
@@ -115,7 +113,7 @@ def main(
     diff_filter_staging: bool = True,
     ignore_by_gitignore: bool = False,
 ) -> None:
-    """Add `from __future__ import annotations` to `.py` files.
+    r"""Add `from __future__ import annotations` to `.py` files.
 
     This statement tells the interpreter to treat type hints as string literals,
     improving forwards/backwards compatibility between python versions
@@ -125,6 +123,8 @@ def main(
         - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
         - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
             https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
+    - Note the custom filtering I wrote is superfluous with `files=r"^.*\.py$"` and `pass filenames`
+     (why did I write this...though this does let you run it as a CLI independent of pre-commit)
 
     Arguments:
         proj_root : Path
