@@ -1,4 +1,5 @@
 # ruff: noqa: E731
+import os
 import warnings
 from collections.abc import Iterable
 from pathlib import Path
@@ -10,7 +11,7 @@ from ahooks.utils._preCommitConfigBlock import PreCommitConfigBlock as cb
 from ahooks.utils.click_utils import (
     READ_DIR_TYPE,
     READ_FILE_TYPE,
-    WRITE_FILE_TYPE,
+    WRITE_DIR_TYPE,
 )
 
 from .utils.git_utils import check_ignored, find_repo_root
@@ -43,22 +44,25 @@ def iter_env_var_names(
 @click.command
 @click.argument("git_repo_root", type=READ_DIR_TYPE)
 @click.argument("base_env_path", type=READ_FILE_TYPE)
-@click.argument("skelenv_path", type=WRITE_FILE_TYPE)
+@click.argument("skelenv_dir", type=WRITE_DIR_TYPE)
 @cb(
     id="env-skeleton",
     name="Create an example `.env` file with only the names of variables",
     entry="python -m ahooks.env_skeleton",
     language="system",
     pass_filenames=False,
-    args=(".", ".env", ".env.skeleton"),
+    args=(".", ".env", "."),
     stages=("pre-commit", "pre-push"),
 )
-def main(git_repo_root: Path, base_env_path: Path, skelenv_path: Path) -> None:
+def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
     """Create an example `.env` file with only the names of variables.
 
     Keeps a Git-safe record of what .env vars you may set for the project.
     """
     git_root: Path = find_repo_root(git_repo_root)
+
+    skelenv_path = skelenv_dir / (os.path.basename(base_env_path) + ".skeleton")
+
     warn_if_git_ignored(git_root, skelenv_path)
 
     with skelenv_path.open("w") as file:
