@@ -52,7 +52,7 @@ def echo_updated(hook_name: str, path: Path | str) -> None:
 
 
 def _hook_name(s: str) -> str:
-    return f"[[{s.replace('_', '-')}]"
+    return f"[{s.replace('_', '-')}]"
 
 
 def _stage_msg(hook_name: str, *paths: Path | str):
@@ -69,4 +69,4 @@ def stage_if_true(
         git_add(*paths)
         click.echo(_stage_msg(hook_name, *paths))
     else:
-        click.echo(f"[{hook_name}] All up to date")
+        click.echo(f"{_hook_name(hook_name)} All up to date")
