@@ -1,4 +1,3 @@
-# ruff: noqa: E731
 from __future__ import annotations
 
 import io
@@ -24,10 +23,10 @@ from .utils.git_utils import check_ignored, find_repo_root, git_add
 def raise_if_git_ignored(git_root: Path, skelenv_path: Path) -> None:
     """If the mock .env path would be ignored...there's no real point to this hook."""
     if check_ignored(git_root, skelenv_path):
-        raise click.ClickException(f"{skelenv_path} is ignored.")
+        raise click.ClickException(f"{skelenv_path} ignored.")  # noqa: TRY003
 
 
-def iter_env_var_names(
+def _iter_env_var_names(
     p: Path, include_eq_sign: bool = True, strip_export: bool = True
 ) -> Iterable[str]:
     offset = 0 if not include_eq_sign else 1
@@ -58,7 +57,7 @@ def build_skeleton(base_env_path: Path) -> str:
         ),
     )
     seen: set[str] = set()
-    for var in sorted(iter_env_var_names(base_env_path)):
+    for var in sorted(_iter_env_var_names(base_env_path)):
         if var in seen:
             continue
         seen.add(var)
