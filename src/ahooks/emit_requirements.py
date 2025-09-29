@@ -21,8 +21,8 @@ import tomli
 
 from ahooks.utils._click_utils import (
     NotInstalledException,
-    SubprocessReturnCodeException,
-    updated,
+    raise_if_return_code,
+    stage_if_true,
 )
 
 from .utils import PreCommitConfigBlock as cb
@@ -106,17 +106,8 @@ def main() -> None:
     dep_type = _get_dep_type(path)
     cmd = _construct_command(dep_type)
     result = subprocess.run(cmd, capture_output=True, text=True)
-    click.echo("")
-    updated("emit-requirements", "requirements.txt")
-    logger.log(
-        (logging.ERROR if result.returncode != 0 else logging.DEBUG),
-        {
-            "event": "emit-requirements",
-            "details": {"stderr": result.stderr.strip(), "stdout": result.stdout},
-        },
-    )
-    if result.returncode != 0:
-        raise SubprocessReturnCodeException("`uv pip compile`", result)
+    raise_if_return_code("`uv pip compile`", result)
+    stage_if_true(True, "emit-requirements", path.parent / "requirements.txt")
 
 
 if __name__ == "__main__":

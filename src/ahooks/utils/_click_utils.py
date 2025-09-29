@@ -26,6 +26,11 @@ class SubprocessReturnCodeException(click.ClickException):
         )
 
 
+def raise_if_return_code(command_name: str, result: CompletedProcess[str]) -> None:
+    if result.returncode != 0:
+        raise SubprocessReturnCodeException(command_name, result)
+
+
 READ_DIR_TYPE = click.Path(
     exists=True, file_okay=False, dir_okay=True, path_type=Path, readable=True
 )
@@ -42,8 +47,8 @@ WRITE_DIR_TYPE = click.Path(
 )
 
 
-def updated(hook_name: str, path: Path | str) -> None:
-    click.echo(f"[{hook_name}] Updated and staged: {path}")
+def echo_updated(hook_name: str, path: Path | str) -> None:
+    click.echo(f"[{hook_name}] Updated: {path}")
 
 
 def stage_if_true(cond: bool, /, hook_name: str, path: Path) -> None:
