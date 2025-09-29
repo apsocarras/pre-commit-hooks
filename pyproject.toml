@@ -7,9 +7,132 @@ requires-python = ">=3.9"
 dependencies = [
     "click>=8.1.8",
     "tomli>=2.2.1",
+    "typing-extensions>=4.15.0",
 ]
 
 [dependency-groups]
 dev = [
+    "debugpy>=1.8.17",
+    "deptry>=0.23.1",
+    "ipykernel>=6.30.1",
+    "mypy>=1.18.2",
     "pre-commit>=4.3.0",
+    "ruff>=0.13.2",
+]
+test = [
+    "coverage>=7.10.7",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "python-dotenv>=1.1.1",
+]
+
+[tool.deptry]
+extend_exclude = [
+  ".venv/",
+  "deprecated/"
+]
+
+[tool.deptry.per_rule_ignores]
+DEP004 = ["docs", "tests"]
+
+
+[tool.mypy]
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+no_implicit_reexport = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_any_unimported = true
+warn_return_any = true
+show_error_codes = true
+exclude = "^(libs/|deprecated/)"
+
+[[tool.mypy.overrides]]
+module = ["requests", "yaml"]
+ignore_missing_imports = true
+
+[tool.ruff]
+extend-exclude = [
+    "deprecated/", 
+    "libs/",
+    "_local/"
+]
+unsafe-fixes = true
+line-length = 88
+
+target-version = "py39"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+quote-style = "double"
+## indent-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # flake8-debugger
+    "T10",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pycodestyle
+    "E", "W",
+    # pyflakes
+    "F",
+    # pygrep-hooks
+    "PGH",
+    # pyupgrade
+    "UP",
+    # ruff
+    "RUF",
+    # tryceratops
+    "TRY",
+    # pydocstyle 
+    "D"
+]
+ignore=[
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+    # Multi-line docstring summary should start at the first line
+    "D212",
+    # First line should end with a period, question mark, or exclamation point
+    "D415",
+    # Ambiguous name
+    "E741"
+]
+future-annotations = true
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603"]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+ignore-decorators = [
+    "typing.overload", 
+    "typing_extensions.overload"
 ]

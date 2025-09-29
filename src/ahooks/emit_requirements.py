@@ -1,5 +1,3 @@
-# pyright: reportInvalidStringEscapeSequence=false
-
 from __future__ import annotations
 
 import logging
@@ -13,35 +11,36 @@ from typing import Any, Literal
 
 import click
 import tomli
-from ahooks.utils import PreCommitConfigBlock as cb
+
+from .utils import PreCommitConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 
 
-class TestDepsType(Enum):
+class _TestDepsType(Enum):
     GROUP = "group"
     EXTRA = "extra"
 
 
-def get_dep_type(
+def _get_dep_type(
     toml_file: Path,
-) -> Literal[TestDepsType.GROUP, TestDepsType.EXTRA] | None:
+) -> Literal[_TestDepsType.GROUP, _TestDepsType.EXTRA] | None:
     toml: dict[str, Any] = tomli.loads(toml_file.read_text("utf-8"))
     groups = toml.get("dependency-groups", {})
     if "test" in groups:
-        return TestDepsType.GROUP
+        return _TestDepsType.GROUP
     project = toml.get("project", {})
     opt = project.get("optional-dependencies", {})
     if "test" in opt:
-        return TestDepsType.EXTRA
+        return _TestDepsType.EXTRA
     return None
 
 
-def construct_command(dep_type: TestDepsType | None) -> list[str]:
+def _construct_command(dep_type: _TestDepsType | None) -> list[str]:
     cmd = ["uv", "pip", "compile"]
-    if dep_type == TestDepsType.GROUP:
+    if dep_type == _TestDepsType.GROUP:
         cmd += ["--group", "test"]
-    elif dep_type == TestDepsType.EXTRA:
+    elif dep_type == _TestDepsType.EXTRA:
         cmd += ["--extra", "test"]
     cmd += ["pyproject.toml", "-o", "requirements.txt"]
     return cmd
@@ -51,11 +50,11 @@ def construct_command(dep_type: TestDepsType | None) -> list[str]:
 @cb(
     id="block-manual-req-edits",
     name="Block manual edits to requirements.txt",
-    ## TODO: Ideally, for portability reasons,  I would provide another script in this python package
+    ## TODO: Ideally, for portability reasons, I would provide another script in this python package
     # to handle this pre-filter. But anyone can modify the default pre-config blocks after they're output.
-    entry="""
-     bash -c 
-            if git diff --cached --name-only | grep -q "^requirements\.txt$" && 
+    entry=r"""
+     bash -c
+            if git diff --cached --name-only | grep -q "^requirements\.txt$" &&
                 ! git diff --cached --name-only | grep -q "^pyproject\.toml$"; then
                 echo "Edit pyproject.toml and run the emitter; don't hand-edit requirements.txt."
                 exit 1
@@ -84,14 +83,17 @@ def main():
         cloud deployment, which is usually in CI/CD pipelines.
     """
     if not shutil.which("uv"):
-        warnings.warn("You must install `uv` to run this hook.")
+        warnings.warn("You must install `uv` to run this hook.", stacklevel=2)
         sys.exit(1)
     if not (path := Path("pyproject.toml")).is_file():
-        warnings.warn("`uv pip compile` requires a pyproject.toml in the project root.")
+        warnings.warn(
+            "`uv pip compile` requires a pyproject.toml in the project root.",
+            stacklevel=2,
+        )
         sys.exit(1)
 
-    dep_type = get_dep_type(path)
-    cmd = construct_command(dep_type)
+    dep_type = _get_dep_type(path)
+    cmd = _construct_command(dep_type)
     result = subprocess.run(cmd, capture_output=True, text=True)
     logger.log(
         (logging.ERROR if result.returncode != 0 else logging.DEBUG),

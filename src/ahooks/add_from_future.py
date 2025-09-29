@@ -1,3 +1,15 @@
+"""Add `from __future__ import annotations` to `.py` files.
+
+This statement tells the interpreter to treat type hints as string literals,
+improving forwards/backwards compatibility between python versions
+and simplifying some solutions for achieving type-safety.
+
+    - Most packages which rely on type introspection (e.g. Pydantic) will support this by now
+    - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
+    - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
+        https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
+"""
+
 from __future__ import annotations
 
 import ast
@@ -8,9 +20,8 @@ from typing import NamedTuple, cast
 
 import click
 
-from ahooks.utils import PreCommitConfigBlock as cb
-from ahooks.utils.click_utils import READ_DIR_TYPE
-
+from .utils import PreCommitConfigBlock as cb
+from .utils.click_utils import READ_DIR_TYPE
 from .utils.git_utils import (
     iter_py_filtered,
 )
@@ -31,21 +42,21 @@ IGNORE_DIRS = frozenset[str](
 )
 
 
-class NodeLoc(NamedTuple):
+class _NodeLoc(NamedTuple):
     idx: int
     lineno: int
 
 
-def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
-    """
+def find_insertion_point(mod: ast.Module) -> _NodeLoc | None:
+    """Locate where to insert the import statement in the `.py` file
+
     Assumes:
         - If present, `from __future__ import annotations` is the very first import statement in a module.
         - Docstring is not preceded by any other lines.
     """
-
     # fmt: off
     docstring_offset = (
-        0 
+        0
         if not ast.get_docstring(mod)
         else cast(int, mod.body[0].end_lineno)
     )
@@ -55,16 +66,16 @@ def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
         if isinstance(node, ast.ImportFrom):
             if node.module == "__future__":
                 return
-            return NodeLoc(
+            return _NodeLoc(
                 idx,
                 node.lineno + docstring_offset,
             )
     idx = 0 if not ast.get_docstring(mod) else 1
 
-    return NodeLoc(idx, docstring_offset)
+    return _NodeLoc(idx, docstring_offset)
 
 
-def rewrite_file_with_future(src_code: str, path: Path, loc: NodeLoc) -> None:
+def _rewrite_file_with_future(src_code: str, path: Path, loc: _NodeLoc) -> None:
     # Add preceding newline only if it's not the first node (i.e. if module has a docstring)
     from_future = f"\n{FROM_FUTURE}\n" if loc.idx != 0 else f"{FROM_FUTURE}\n\n"
     lines = src_code.splitlines(keepends=True)
@@ -73,13 +84,13 @@ def rewrite_file_with_future(src_code: str, path: Path, loc: NodeLoc) -> None:
         file.writelines(lines)
 
 
-def add_statement(path: Path) -> Path | None:
+def _add_statement(path: Path) -> Path | None:
     src_code = path.read_text(encoding="utf-8")
     mod = ast.parse(src_code, filename=str(path))
-    loc: NodeLoc | None = find_insertion_point(mod)
+    loc: _NodeLoc | None = find_insertion_point(mod)
     if loc is None:
         return None
-    rewrite_file_with_future(src_code, path, loc)
+    _rewrite_file_with_future(src_code, path, loc)
     return path
 
 
@@ -110,8 +121,10 @@ def main(
     improving forwards/backwards compatibility between python versions
     and simplifying some solutions for achieving type-safety.
 
-    - Most packages which rely on type introspection (e.g. Pydantic) will support this by now
-    - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
+        - Most packages which rely on type introspection (e.g. Pydantic) will support this by now
+        - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
+        - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
+            https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
 
     Arguments:
         proj_root : Path
@@ -126,7 +139,6 @@ def main(
             - Can use as a fallback in case you meant to ignore something in .gitignore but it's not in there.
             - Can also use to ignore files independently of your Git rules.
     """
-
     root = Path(proj_root)
 
     gitignore: Path | None = root / ".gitignore" if ignore_by_gitignore else None
@@ -135,7 +147,7 @@ def main(
     added_files: tuple[str, ...] = tuple(
         added.name
         for p in iter_py_filtered(root, diff_filter_staging, gitignore, ignores)
-        if (added := add_statement(p))
+        if (added := _add_statement(p))
     )
     # fmt: on
     if added_files:
