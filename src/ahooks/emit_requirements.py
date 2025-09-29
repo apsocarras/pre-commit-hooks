@@ -13,8 +13,7 @@ from typing import Any, Literal
 
 import click
 import tomli
-
-from pre_commit_hooks.utils import PreCommitConfigBlock as cb
+from ahooks.utils import PreCommitConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 

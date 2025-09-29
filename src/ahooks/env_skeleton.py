@@ -4,9 +4,8 @@ from pathlib import Path
 from typing import Any
 
 import click
-
-from pre_commit_hooks.utils._preCommitConfigBlock import PreCommitConfigBlock as cb
-from pre_commit_hooks.utils.click_utils import (
+from ahooks.utils._preCommitConfigBlock import PreCommitConfigBlock as cb
+from ahooks.utils.click_utils import (
     READ_DIR_TYPE,
     READ_FILE_TYPE,
     WRITE_FILE_TYPE,

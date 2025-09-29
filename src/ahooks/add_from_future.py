@@ -8,8 +8,8 @@ from typing import NamedTuple, cast
 
 import click
 
-from pre_commit_hooks.utils import PreCommitConfigBlock as cb
-from pre_commit_hooks.utils.click_utils import READ_DIR_TYPE
+from ahooks.utils import PreCommitConfigBlock as cb
+from ahooks.utils.click_utils import READ_DIR_TYPE
 
 from .utils.git_utils import (
     iter_py_filtered,
