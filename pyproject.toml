@@ -1,7 +1,7 @@
 [project]
-name = "pre-commit-hooks"
+name = "ahooks"
 version = "0.1.0"
-description = "Consolidating the pre-commit hooks I use into this git submodule."
+description = "Single python package for all the pre-commit hooks I use."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
