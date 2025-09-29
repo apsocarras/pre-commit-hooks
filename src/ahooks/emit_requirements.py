@@ -1,16 +1,29 @@
+# ruff: noqa: TRY003
+"""
+Emit `requirements.txt` from a `pyproject.toml` using `uv`
+
+If the `pyproject.toml` has a `test` group, it includes it.
+    - The only real purpose of emitting requirements.txt is for
+    cloud deployment, which is usually in CI/CD pipelines.
+"""
+
 from __future__ import annotations
 
 import logging
 import shutil
 import subprocess
-import sys
-import warnings
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
 
 import click
 import tomli
+
+from ahooks.utils._click_utils import (
+    NotInstalledException,
+    SubprocessReturnCodeException,
+    updated,
+)
 
 from .utils import PreCommitConfigBlock as cb
 
@@ -74,7 +87,7 @@ def _construct_command(dep_type: _TestDepsType | None) -> list[str]:
     files=r"^(pyproject\.toml|requirements\.txt)$",
     stages=("pre-commit", "pre-push"),
 )
-def main():
+def main() -> None:
     """
     Emit `requirements.txt` from a `pyproject.toml` using `uv`
 
@@ -83,18 +96,18 @@ def main():
         cloud deployment, which is usually in CI/CD pipelines.
     """
     if not shutil.which("uv"):
-        warnings.warn("You must install `uv` to run this hook.", stacklevel=2)
-        sys.exit(1)
+        raise NotInstalledException("uv")
+
     if not (path := Path("pyproject.toml")).is_file():
-        warnings.warn(
-            "`uv pip compile` requires a pyproject.toml in the project root.",
-            stacklevel=2,
+        raise click.ClickException(
+            "`uv pip compile` requires a pyproject.toml in the project root."
         )
-        sys.exit(1)
 
     dep_type = _get_dep_type(path)
     cmd = _construct_command(dep_type)
     result = subprocess.run(cmd, capture_output=True, text=True)
+    click.echo("")
+    updated("emit-requirements", "requirements.txt")
     logger.log(
         (logging.ERROR if result.returncode != 0 else logging.DEBUG),
         {
@@ -103,7 +116,7 @@ def main():
         },
     )
     if result.returncode != 0:
-        sys.exit(result.returncode)
+        raise SubprocessReturnCodeException("`uv pip compile`", result)
 
 
 if __name__ == "__main__":

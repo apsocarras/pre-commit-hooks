@@ -1,10 +1,30 @@
 from __future__ import annotations
 
 from pathlib import Path
+from subprocess import CompletedProcess
 
 import click
 
 from ahooks.utils.git_utils import git_add
+
+
+class NotInstalledException(click.ClickException):
+    def __init__(self, *args: str) -> None:
+        super().__init__(
+            f"You must install the following to use this hook: {', '.join(args)}."
+        )
+
+
+class SubprocessReturnCodeException(click.ClickException):
+    def __init__(
+        self,
+        command_name: str,
+        subprocess: CompletedProcess[str],
+    ) -> None:
+        super().__init__(
+            f"`{command_name}` failed with exit code {subprocess.returncode}."
+        )
+
 
 READ_DIR_TYPE = click.Path(
     exists=True, file_okay=False, dir_okay=True, path_type=Path, readable=True
@@ -22,7 +42,11 @@ WRITE_DIR_TYPE = click.Path(
 )
 
 
-def stage_if_true(cond: bool, /, hook_name: str, path: Path):
+def updated(hook_name: str, path: Path | str) -> None:
+    click.echo(f"[{hook_name}] Updated and staged: {path}")
+
+
+def stage_if_true(cond: bool, /, hook_name: str, path: Path) -> None:
     if cond:
         git_add(path)
         click.echo(f"[{hook_name}] Updated and staged: {path}")
