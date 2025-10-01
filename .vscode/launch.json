@@ -87,5 +87,17 @@
         "envFile": "${workspaceFolder}/.env",
         "justMyCode": true, 
         },
+
+            {
+        "name": "Python: Run sequence_not_str.py",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "ahooks.sequence_not_str",
+        "args": ["scrap.py"],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env",
+        "justMyCode": true, 
+        },
     ]
 }

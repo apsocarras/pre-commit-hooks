@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from ._preCommitConfigBlock import PreCommitConfigBlock
+from .preCommitConfigBlock import PreCommitConfigBlock
 
 __all__ = ["PreCommitConfigBlock"]

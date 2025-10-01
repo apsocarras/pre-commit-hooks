@@ -17,9 +17,11 @@ from __future__ import annotations
 import ast
 from collections.abc import Collection
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import cast
 
 import click
+
+from ahooks._types import NodeLoc
 
 from .utils import PreCommitConfigBlock as cb
 from .utils._click_utils import READ_DIR_TYPE, stage_if_true
@@ -40,12 +42,7 @@ IGNORE_DIRS = frozenset[str](
 )
 
 
-class _NodeLoc(NamedTuple):
-    idx: int
-    lineno: int
-
-
-def find_insertion_point(mod: ast.Module) -> _NodeLoc | None:
+def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
     """Locate where to insert the import statement in the `.py` file
 
     Assumes:
@@ -64,16 +61,16 @@ def find_insertion_point(mod: ast.Module) -> _NodeLoc | None:
         if isinstance(node, ast.ImportFrom):
             if node.module == "__future__":
                 return
-            return _NodeLoc(
+            return NodeLoc(
                 idx,
                 node.lineno + docstring_offset,
             )
     idx = 0 if not ast.get_docstring(mod) else 1
 
-    return _NodeLoc(idx, docstring_offset)
+    return NodeLoc(idx, docstring_offset)
 
 
-def _rewrite_file_with_future(src_code: str, path: Path, loc: _NodeLoc) -> None:
+def _rewrite_file_with_future(src_code: str, path: Path, loc: NodeLoc) -> None:
     # Add preceding newline only if it's not the first node (i.e. if module has a docstring)
     from_future = f"\n{FROM_FUTURE}\n" if loc.idx != 0 else f"{FROM_FUTURE}\n\n"
     lines = src_code.splitlines(keepends=True)
@@ -85,7 +82,7 @@ def _rewrite_file_with_future(src_code: str, path: Path, loc: _NodeLoc) -> None:
 def _add_statement(path: Path) -> Path | None:
     src_code = path.read_text(encoding="utf-8")
     mod = ast.parse(src_code, filename=str(path))
-    loc: _NodeLoc | None = find_insertion_point(mod)
+    loc: NodeLoc | None = find_insertion_point(mod)
     if loc is None:
         return None
     _rewrite_file_with_future(src_code, path, loc)
