@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .preCommitConfigBlock import PreCommitConfigBlock
+from .preCommitConfigYaml import HookConfigBlock, PreCommitConfigRepo
 
-__all__ = ["PreCommitConfigBlock"]
+__all__ = ["HookConfigBlock", "PreCommitConfigRepo"]
