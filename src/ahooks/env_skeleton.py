@@ -20,7 +20,7 @@ from ahooks.utils._click_utils import (
     WRITE_DIR_TYPE,
     stage_if_true,
 )
-from ahooks.utils.preCommitConfigBlock import HookConfigBlock as cb
+from ahooks.utils.preCommitConfigYaml import HookConfigBlock as cb
 
 from .utils._file_utils import write_, write_if_changed
 from .utils.git_utils import check_ignored, find_repo_root
