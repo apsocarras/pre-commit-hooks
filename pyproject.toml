@@ -23,6 +23,7 @@ test = [
     "coverage>=7.10.7",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+    "pytest-git>=1.8.0",
     "python-dotenv>=1.1.1",
 ]
 
