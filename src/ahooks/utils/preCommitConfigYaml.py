@@ -14,13 +14,13 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class PreCommitConfigYaml(TypedDict):
+class _PreCommitConfigYaml(TypedDict):
     """Schema for `.pre-commit-config.yaml` file"""
 
-    repos: tuple[RepoConfigBlock, ...]
+    repos: tuple[_RepoConfigBlock, ...]
 
 
-class RepoConfigBlock(TypedDict):
+class _RepoConfigBlock(TypedDict):
     """Repo entry in .pre-commit-config.yaml"""
 
     repo: str
@@ -39,13 +39,42 @@ class _HookBlockKwargs(TypedDict):
     args: NotRequired[Collection[str] | None]
 
 
+class PreCommitConfigRepo:
+    """Store any hook config blocks within the same repo via this container"""
+
+    def __init__(self, repo: str = "local") -> None:
+        self._repo: str = repo
+        self._hooks: set[Callable[..., Any]] = set()
+
+    def add_hook(self, h: Callable[..., Any]) -> None:
+        self._hooks.add(h)
+
+    def to_config(self) -> _PreCommitConfigYaml:
+        """Dump to dict matching yaml schema"""
+        _repo_config_block: _RepoConfigBlock = {
+            "repo": self._repo,
+            "hooks": tuple[_HookBlockKwargs, ...](
+                hb.dump() for h in self._hooks if (hb := HookConfigBlock.extract(h))
+            ),
+        }
+        return {"repos": (_repo_config_block,)}
+
+
+_module_precommit_repo = PreCommitConfigRepo()
+
+
 class HookConfigBlock:
     """Decorator for attaching default `.pre-commit-config.yaml` configurations to hooks
 
     Corresponds to the `hook` level entries (under `hooks` in the yaml)
     """
 
-    def __init__(self, **kwargs: Unpack[_HookBlockKwargs]) -> None:
+    def __init__(
+        self,
+        repo: PreCommitConfigRepo = _module_precommit_repo,
+        **kwargs: Unpack[_HookBlockKwargs],
+    ) -> None:
+        self._repo: PreCommitConfigRepo = repo
         self.id: str = kwargs["id"]
         self.name: str | None = kwargs.get("name")
         self.entry: str | None = kwargs.get("entry")
@@ -60,11 +89,15 @@ class HookConfigBlock:
         )
 
     def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
-        """Attach or append to a hidden member `_pc_config: list[HookConfigBlock]` to a function"""
+        """Attach or append to a hidden member `_pc_config: list[HookConfigBlock]` to a function
+
+        Also registers the function in the repo block
+        """
         if not hasattr(func, "_pc_config"):
             func._pc_config = [self]  # pyright: ignore[reportFunctionMemberAccess]
         else:
             func._pc_config.append(self)  # pyright: ignore[reportFunctionMemberAccess, reportAny]
+        self._repo.add_hook(func)
         return func
 
     @classmethod
@@ -87,30 +120,3 @@ class HookConfigBlock:
             if a is not None:
                 d[name] = a
         return d
-
-
-class PreCommitConfigRepo:
-    """Decorator to attach pre-commit hook entries to functions while collecting them under one `repo` entry"""
-
-    def __init__(self, repo: str) -> None:
-        self._repo: str = repo
-        self._hooks: set[Callable[..., Any]] = set()
-
-    def __call__(
-        self, func: Callable[P, R], **kwargs: Unpack[_HookBlockKwargs]
-    ) -> Callable[P, R]:
-        """Applies a `HookConfigBlock` to the function. Stores the function"""
-        block: HookConfigBlock = HookConfigBlock(**kwargs)
-        applied_func: Callable[P, R] = block(func)
-        self._hooks.add(applied_func)
-        return applied_func
-
-    def to_config(self) -> PreCommitConfigYaml:
-        """Dump to dict matching yaml schema"""
-        _repo_config_block: RepoConfigBlock = {
-            "repo": self._repo,
-            "hooks": tuple[_HookBlockKwargs, ...](
-                hb.dump() for h in self._hooks if (hb := HookConfigBlock.extract(h))
-            ),
-        }
-        return {"repos": (_repo_config_block,)}
