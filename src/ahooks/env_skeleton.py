@@ -84,7 +84,7 @@ def build_skeleton(base_env_path: Path) -> str:
     args=(".", ".env", "."),
     stages=("pre-commit", "pre-push"),
 )
-def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
+def env_skeleton(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
     """Create an example `.env` file with only the names of variables.
 
     Keeps a Git-safe record of what .env vars you may set for the project.
@@ -99,4 +99,4 @@ def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    env_skeleton()

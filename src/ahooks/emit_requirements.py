@@ -87,7 +87,7 @@ def _construct_command(dep_type: _TestDepsType | None) -> list[str]:
     files=r"^(pyproject\.toml|requirements\.txt)$",
     stages=("pre-commit", "pre-push"),
 )
-def main() -> None:
+def emit_requirements() -> None:
     """
     Emit `requirements.txt` from a `pyproject.toml` using `uv`
 
@@ -111,4 +111,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    emit_requirements()

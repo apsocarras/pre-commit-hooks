@@ -104,7 +104,7 @@ def _add_statement(path: Path) -> Path | None:
     args=["-ds"],
     files=r"^.*\.py$",
 )
-def main(
+def add_from_future(
     proj_root: Path,
     ignores: Collection[Path] = (),
     diff_filter_staging: bool = True,
@@ -154,4 +154,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    add_from_future()
