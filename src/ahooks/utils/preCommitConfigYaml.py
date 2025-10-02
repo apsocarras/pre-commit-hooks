@@ -2,15 +2,40 @@
 
 from __future__ import annotations
 
+import io
+import logging
+import warnings
+from io import StringIO
+from pathlib import Path
 from typing import Any, Callable
 
 import attr
 import cattrs
+from cattrs.converters import Converter
 from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
-from click.utils import P, R
+from ruamel.yaml import YAML
 from typing_extensions import Any
+from useful_types import SequenceNotStr as Sequence
 
-from ahooks._types import GitStage
+from ahooks._exceptions import PreCommitYamlValidationError
+from ahooks.utils._file_utils import write_atomic
+
+from .._types import (
+    FAILED_OP,
+    FINISH_OP,
+    GitStage,
+    HookChoice,
+    OpSentinel,
+    P,
+    R,
+)
+
+logger = logging.getLogger(__name__)
+yaml = YAML()
+
+
+def _matches_name(repo_name: str, r: RepoConfigBlock) -> bool:
+    return r.repo.strip().lower() == repo_name
 
 
 @attr.define
@@ -18,6 +43,51 @@ class PreCommitConfigYaml:
     """Schema for `.pre-commit-config.yaml` file"""
 
     repos: list[RepoConfigBlock]
+
+    def extend(self, repo_block: RepoConfigBlock) -> OpSentinel:
+        """Search for repo name in the config yaml and append the given hooks
+
+        - If the same name exists, adds to it
+        - Else, adds as a new repo block at the end of the yaml
+        """
+        repo_name = repo_block.repo
+        hooks = repo_block.hooks
+
+        def _find_repo_and_append() -> OpSentinel:
+            try:
+                idx = next(
+                    n for n, r in enumerate(self.repos) if _matches_name(repo_name, r)
+                )
+                exist_hooks: list[HookConfigBlock] = self.repos[idx].hooks
+                exist_hook_ids = {h.id for h in exist_hooks}
+                for h in hooks:
+                    if h.id in exist_hook_ids:
+                        warnings.warn(
+                            f"Provided yaml already has a hook named {h.id}. Skipping.",
+                            stacklevel=2,
+                        )
+                        continue
+                    exist_hooks.append(h)
+                if len(exist_hook_ids) == len(exist_hooks):
+                    return FAILED_OP
+                else:
+                    return FINISH_OP
+            except StopIteration:
+                return FAILED_OP
+
+        if _find_repo_and_append():
+            return FINISH_OP
+
+        self.repos.append(repo_block)
+        return FINISH_OP
+
+    def append_hooks(self, repo_name: str, *hooks: HookConfigBlock) -> OpSentinel:
+        """Search for repo name in the config yaml and append the given hooks
+
+        - If the same name exists, adds to it
+        - Else, adds another block at the end of the yaml
+        """
+        return self.extend(RepoConfigBlock(repo_name, list(hooks)))
 
 
 @attr.define
@@ -67,13 +137,6 @@ class HookConfigBlock:
         return func
 
 
-conv = cattrs.Converter()
-
-# JSON serialiization
-conv.register_unstructure_hook(tuple, list)
-conv.register_unstructure_hook(set, list)
-
-
 def _omit_unstructurer(cls) -> Callable[..., dict[str, Any]]:
     """Omit if field metadata says to"""
     fn: Callable[[Any], dict[str, Any]] = make_dict_unstructure_fn(
@@ -93,6 +156,67 @@ def _omit_unstructurer(cls) -> Callable[..., dict[str, Any]]:
     return wrapped
 
 
-for cls in (HookConfigBlock, RepoConfigBlock, PreCommitConfigYaml):
-    conv.register_unstructure_hook(cls, _omit_unstructurer(cls))
-    conv.register_structure_hook(cls, make_dict_structure_fn(cls, conv))
+def _register_hooks(conv: cattrs.Converter) -> None:
+    # JSON serialiization
+    conv.register_unstructure_hook(tuple, list)
+    conv.register_unstructure_hook(set, list)
+
+    for cls in (HookConfigBlock, RepoConfigBlock, PreCommitConfigYaml):
+        conv.register_unstructure_hook(cls, _omit_unstructurer(cls))
+        conv.register_structure_hook(cls, make_dict_structure_fn(cls, conv))
+
+
+def _get_converter() -> Converter:
+    conv = cattrs.Converter()
+    _register_hooks(conv)
+    return conv
+
+
+conv = _get_converter()
+
+
+def dump_config(config: PreCommitConfigYaml, path: Path) -> None:
+    """Dump to yaml"""
+    des = conv.unstructure(config)
+    buf: StringIO = io.StringIO()
+    yaml.dump(des, buf)
+    write_atomic(path, buf.getvalue())
+
+
+def load_config(path: Path) -> PreCommitConfigYaml:
+    """Load a .pre-commit-config.yaml into a structured object"""
+    try:
+        with path.open("r") as file:
+            config = yaml.load_all(file)
+        return conv.structure(config, PreCommitConfigYaml)
+    except cattrs.BaseValidationError as e:
+        raise PreCommitYamlValidationError() from e
+
+
+def get_ahook_config(*hook_choices: HookChoice) -> PreCommitConfigYaml:
+    """Create a config yaml from this package's hooks"""
+    if hook_choices:
+        choice_set = set(hook_choices)
+        filtered_hooks = [h for h in _module_precommit_repo.hooks if h in choice_set]
+        filtered_repo = RepoConfigBlock(hooks=filtered_hooks)
+        return PreCommitConfigYaml(repos=[filtered_repo])
+    else:
+        return PreCommitConfigYaml(repos=[_module_precommit_repo])
+
+
+def dump_ahook_config(path: Path, *hooks: HookChoice) -> OpSentinel:
+    """Open the config yaml and append the packages's hooks (if the file exists) or create a new config.yaml"""
+    module_config: PreCommitConfigYaml = get_ahook_config(*hooks)
+
+    if not path.exists():
+        dump_config(module_config, path)
+        return FINISH_OP
+
+    user_config: PreCommitConfigYaml = load_config(path)
+    append_result: OpSentinel = user_config.extend(repo_block=module_config.repos[0])
+
+    if not append_result:
+        return FAILED_OP
+    else:
+        dump_config(user_config, path)
+    return FINISH_OP

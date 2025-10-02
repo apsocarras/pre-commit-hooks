@@ -11,6 +11,7 @@ dependencies = [
     "ruamel-yaml>=0.18.15",
     "tomli>=2.2.1",
     "typing-extensions>=4.15.0",
+    "useful-types>=0.2.1",
 ]
 
 [dependency-groups]
@@ -130,9 +131,12 @@ unfixable = []
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S603"]
 
-[tool.ruff.lint.isort]
-required-imports = ["from __future__ import annotations"]
 
+[tool.ruff.lint.isort]
+required-imports = [
+    "from __future__ import annotations",
+    "from useful_types import SequenceNotStr as Sequence # noqa: F401"
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

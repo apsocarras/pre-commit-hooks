@@ -18,6 +18,9 @@ from typing import Any, Literal
 
 import click
 import tomli
+from useful_types import (
+    SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
+)
 
 from ahooks.utils._click_utils import (
     NotInstalledException,

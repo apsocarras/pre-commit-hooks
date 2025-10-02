@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Callable
 
 import click
+from useful_types import (
+    SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
+)
 
 from ahooks.utils._click_utils import (
     READ_DIR_TYPE,
