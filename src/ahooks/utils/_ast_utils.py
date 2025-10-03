@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 
+from useful_types import SequenceNotStr as Sequence
+
 
 def get_target_id(node: ast.AnnAssign):
     if isinstance(node.target, ast.Name):

@@ -1,5 +1,11 @@
 from __future__ import annotations
 
-from .preCommitConfigYaml import HookConfigBlock, PreCommitConfigRepo
+from useful_types import SequenceNotStr as Sequence
 
-__all__ = ["HookConfigBlock", "PreCommitConfigRepo"]
+from .preCommitConfigYaml import HookConfigBlock, PreCommitConfigYaml, RepoConfigBlock
+
+__all__ = [
+    "HookConfigBlock",
+    "PreCommitConfigYaml",
+    "RepoConfigBlock",
+]

@@ -1,0 +1,34 @@
+---
+minimum_pre_commit_version: 3.0.0
+repos:
+  - hooks:
+      - id: block-manual-req-edits
+        name: Block manual edits to requirements.txt
+        language: system
+        entry: bash -c 'if git diff --cached --name-only | grep -q "^requirements\.txt$" && ! git diff --cached --name-only | grep -q "^pyproject\.toml$"; then echo "Edit pyproject.toml and run the emitter; don'\''t hand-edit requirements.txt."; exit 1; fi'
+        pass_filenames: false
+        files: ^requirements\.txt$
+        stages: [commit, push]
+      - id: emit-requirements
+        name: Emit requirements.txt from pyproject.toml using `uv`
+        language: system
+        entry: python -m ahooks.emit_requirements
+        pass_filenames: false
+        files: ^(pyproject\.toml|requirements\.txt)$
+        stages: [commit, push]
+      - id: env-skeleton
+        name: Create an example `.env` file with only the names of variables
+        language: system
+        entry: python -m ahooks.env_skeleton
+        args: [' . ', .env, ' . ']
+        pass_filenames: false
+        stages: [commit, push]
+      - id: add-from-future
+        name: Add `from __future__ import annotations` to `.py` files.
+        language: python
+        entry: python -m ahooks.add_from_future
+        args: [-ds]
+        pass_filenames: false
+        files: ^.*\.py$
+        stages: [commit]
+...

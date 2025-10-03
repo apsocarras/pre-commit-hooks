@@ -5,15 +5,17 @@ from __future__ import annotations
 import io
 import logging
 import warnings
+from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import attr
 import cattrs
 from cattrs.converters import Converter
 from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
 from ruamel.yaml import YAML
+from ruamel.yaml.main import YAML
 from typing_extensions import Any
 from useful_types import SequenceNotStr as Sequence
 
@@ -31,7 +33,22 @@ from .._types import (
 )
 
 logger = logging.getLogger(__name__)
-yaml = YAML()
+
+
+def _get_yaml() -> YAML:
+    yaml = YAML(typ="rt")
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    yaml.preserve_quotes = True  # added in ruamel.yaml
+    yaml.explicit_start = True  # control also available in PyYAML
+    yaml.explicit_end = True  #
+    yaml.width = 4096  # don't fold long lines
+    yaml.preserve_quotes = True
+    yaml.default_flow_style = None
+
+    return yaml
+
+
+yaml = _get_yaml()
 
 
 def _matches_name(repo_name: str, r: RepoConfigBlock) -> bool:
@@ -43,6 +60,7 @@ class PreCommitConfigYaml:
     """Schema for `.pre-commit-config.yaml` file"""
 
     repos: list[RepoConfigBlock]
+    minimum_pre_commit_version: str | None = attr.field(default=None)
 
     def extend(self, repo_block: RepoConfigBlock) -> OpSentinel:
         """Search for repo name in the config yaml and append the given hooks
@@ -113,12 +131,12 @@ class HookConfigBlock:
 
     id: str = attr.field()
     name: str | None = attr.field(default=None)
-    entry: str | None = attr.field(default=None)
     language: str | None = attr.field(default=None)
+    entry: str | None = attr.field(default=None)
+    args: tuple[str, ...] | None = attr.field(default=None)
     pass_filenames: bool | None = attr.field(default=None)
     files: str | None = attr.field(default=None)
     stages: tuple[GitStage, ...] | None = attr.field(default=None)
-    args: tuple[str, ...] | None = attr.field(default=None)
 
     _repo: RepoConfigBlock = attr.field(
         factory=lambda: _module_precommit_repo, metadata={"omit": True}
@@ -137,7 +155,7 @@ class HookConfigBlock:
         return func
 
 
-def _omit_unstructurer(cls) -> Callable[..., dict[str, Any]]:
+def _omit_unstructurer(cls, conv: cattrs.Converter) -> Callable[..., dict[str, Any]]:
     """Omit if field metadata says to"""
     fn: Callable[[Any], dict[str, Any]] = make_dict_unstructure_fn(
         cls, conv, _cattrs_omit_if_default=True
@@ -148,9 +166,8 @@ def _omit_unstructurer(cls) -> Callable[..., dict[str, Any]]:
         return {
             k: v
             for k, v in d.items()
-            if not getattr(cls.__attrs_attrs__[k].metadata, "get", lambda _: False)(
-                "omit"
-            )
+            if attr.has(cls_ := inst.__class__)
+            and not attr.fields_dict(cls_)[k].metadata.get("omit", False)
         }
 
     return wrapped
@@ -162,7 +179,7 @@ def _register_hooks(conv: cattrs.Converter) -> None:
     conv.register_unstructure_hook(set, list)
 
     for cls in (HookConfigBlock, RepoConfigBlock, PreCommitConfigYaml):
-        conv.register_unstructure_hook(cls, _omit_unstructurer(cls))
+        conv.register_unstructure_hook(cls, _omit_unstructurer(cls, conv))
         conv.register_structure_hook(cls, make_dict_structure_fn(cls, conv))
 
 
@@ -179,7 +196,13 @@ def dump_config(config: PreCommitConfigYaml, path: Path) -> None:
     """Dump to yaml"""
     des = conv.unstructure(config)
     buf: StringIO = io.StringIO()
-    yaml.dump(des, buf)
+    yaml.dump(
+        {
+            "minimum_pre_commit_version": des["minimum_pre_commit_version"],
+            "repos": des["repos"],
+        },
+        buf,
+    )
     write_atomic(path, buf.getvalue())
 
 
@@ -187,7 +210,7 @@ def load_config(path: Path) -> PreCommitConfigYaml:
     """Load a .pre-commit-config.yaml into a structured object"""
     try:
         with path.open("r") as file:
-            config = yaml.load_all(file)
+            config = yaml.load(file)
         return conv.structure(config, PreCommitConfigYaml)
     except cattrs.BaseValidationError as e:
         raise PreCommitYamlValidationError() from e

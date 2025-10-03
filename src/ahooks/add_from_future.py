@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import cast
 
 import click
+from useful_types import SequenceNotStr as Sequence
 
 from ahooks._types import NodeLoc
 
@@ -100,8 +101,8 @@ def _add_statement(path: Path) -> Path | None:
     language="python",
     entry="python -m ahooks.add_from_future",
     pass_filenames=False,
-    stages=["pre-commit"],
-    args=["-ds"],
+    stages=("pre-commit",),
+    args=("-ds",),
     files=r"^.*\.py$",
 )
 def add_from_future(

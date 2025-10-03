@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Callable, Literal, TypeVar, Union, cast
 
 from typing_extensions import LiteralString, Self, TypeAlias, override
+from useful_types import SequenceNotStr as Sequence
 
 Ignores: TypeAlias = Annotated[
     Union[Collection[str], Collection[Path]],

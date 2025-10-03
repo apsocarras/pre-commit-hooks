@@ -4,8 +4,11 @@ from collections.abc import Collection
 from typing import Literal, NamedTuple, TypeVar, Union
 
 from typing_extensions import NotRequired, ParamSpec, Sentinel, TypeAlias, TypedDict
+from useful_types import SequenceNotStr as Sequence
 
-GitStage = Literal["pre-commit", "pre-push"]
+_DeprecatedStages: TypeAlias = Literal["commit", "push"]
+_Stages = Literal["pre-commit", "pre-push"]
+GitStage = Literal["pre-commit", "pre-push", "commit", "push"]
 Language = Literal["system", "python"]
 
 P = ParamSpec("P")

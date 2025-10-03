@@ -4,6 +4,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 import click
+from useful_types import SequenceNotStr as Sequence
 
 from ahooks.utils.git_utils import git_add
 
