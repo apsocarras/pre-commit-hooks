@@ -88,7 +88,7 @@
         "justMyCode": true, 
         },
 
-            {
+        {
         "name": "Python: Run sequence_not_str.py",
         "type": "debugpy",
         "request": "launch",
@@ -99,5 +99,16 @@
         "envFile": "${workspaceFolder}/.env",
         "justMyCode": true, 
         },
+        {
+        "name": "Python: Run export.py",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "ahooks.export",
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env",
+        "justMyCode": true, 
+        },
+
     ]
 }

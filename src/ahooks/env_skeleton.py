@@ -8,9 +8,8 @@ from __future__ import annotations
 import io
 import os
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Callable
 
 import click
 from useful_types import (

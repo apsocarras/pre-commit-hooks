@@ -56,7 +56,7 @@ def _hook_name(s: str) -> str:
     return f"[{s.replace('_', '-')}]"
 
 
-def _stage_msg(hook_name: str, *paths: Path | str):
+def _stage_msg(hook_name: str, *paths: Path | str) -> str:
     return f"{_hook_name(hook_name)} Updated and staged: {', '.join(str(p) for p in paths)}"
 
 

@@ -61,7 +61,7 @@ def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
     for idx, node in enumerate(mod.body):
         if isinstance(node, ast.ImportFrom):
             if node.module == "__future__":
-                return
+                return None
             return NodeLoc(
                 idx,
                 node.lineno + docstring_offset,

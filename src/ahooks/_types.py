@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from typing import Literal, NamedTuple, TypeVar, Union
+from typing import Literal, NamedTuple, TypeAlias, TypeVar, Union
 
-from typing_extensions import NotRequired, ParamSpec, Sentinel, TypeAlias, TypedDict
+from typing_extensions import NotRequired, ParamSpec, Sentinel, TypedDict
 from useful_types import SequenceNotStr as Sequence
 
 _DeprecatedStages: TypeAlias = Literal["commit", "push"]
@@ -55,7 +55,7 @@ FAILED_OP = FailedOpSentinel("FAILED_OP")
 FINISH_OP = CompletedOpSentinel("FINISH_OP")
 
 
-OpSentinel: TypeAlias = Union[CompletedOpSentinel, FailedOpSentinel]
+OpSentinel: TypeAlias = CompletedOpSentinel | FailedOpSentinel
 
 
 class HookBlockKwargs(TypedDict):

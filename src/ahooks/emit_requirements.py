@@ -108,7 +108,7 @@ def emit_requirements() -> None:
 
     dep_type = _get_dep_type(path)
     cmd = _construct_command(dep_type)
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
     raise_if_return_code("`uv pip compile`", result)
     stage_if_true(True, "emit-requirements", path.parent / "requirements.txt")
 

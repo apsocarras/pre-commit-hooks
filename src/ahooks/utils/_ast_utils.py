@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import ast
+from typing import Any
 
 from useful_types import SequenceNotStr as Sequence
 
 
-def get_target_id(node: ast.AnnAssign):
+def get_target_id(node: ast.AnnAssign) -> str | Any | None:
     if isinstance(node.target, ast.Name):
         return node.target.id
     elif isinstance(node.target, ast.Attribute):
@@ -49,5 +50,5 @@ def is_sequence_str_annotation(o: object) -> bool:
     )
 
 
-def has_str_in_union_annotation(o: object):
+def has_str_in_union_annotation(o: object) -> bool:
     return isinstance(o, ast.BinOp)

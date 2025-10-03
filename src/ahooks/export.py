@@ -7,14 +7,12 @@ from pathlib import Path
 
 import click
 from ruamel.yaml import YAML
-from typing_extensions import Sentinel
 from useful_types import SequenceNotStr as Sequence
 
 from ahooks.utils._click_utils import WRITE_FILE_TYPE
 from ahooks.utils.preCommitConfigYaml import dump_ahook_config
 
 from ._types import (
-    OMITTED_DEFAULT,
     HookChoice,
 )
 
@@ -47,21 +45,23 @@ _MODULE_CHOICES: tuple[HookChoice, ...] = (
     "-k",
     "hooks",
     type=click.Choice(_MODULE_CHOICES),
-    case_sensitive=False,
+    # case_sensitive=False,
     multiple=True,
     help="Optionally specify which hooks in the package you want to export. If none provided, exports all hooks. Can be invoked multiple times.",
     show_choices=True,
+    default=(),
 )
 @click.option(
     "-o",
     "config_path",
     type=WRITE_FILE_TYPE,
     help="Path to the to the pre-commit config. If it exists, the hooks will be inserted into it.",
+    default=None,
 )
 def export(
     hooks: tuple[HookChoice, ...] = (),
-    config_path: Path | Sentinel = OMITTED_DEFAULT,
-):
+    config_path: Path | None = None,
+) -> None:
     """Export the hooks in this package to a `pre-commit-config.yaml`
 
     Arguments:
@@ -71,11 +71,10 @@ def export(
         Path to the to the pre-commit config. If it exists, the hooks will be inserted into it.
 
     """
-    _res_path: Path = (
-        Path.cwd() / ".pre-commit-config.yaml"
-        if isinstance(config_path, Sentinel)
-        else config_path
-    )
+    if config_path is not None:
+        _res_path = config_path
+    else:
+        _res_path = Path.cwd() / ".pre-commit-config.yaml"
 
     if dump_ahook_config(_res_path, *hooks):
         click.echo(f"Wrote hooks to {_res_path}")
@@ -83,3 +82,7 @@ def export(
         click.echo(
             f"Added no hooks to {_res_path} (hook ids already present in config.)"
         )
+
+
+if __name__ == "__main__":
+    export()

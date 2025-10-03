@@ -11,12 +11,11 @@ from pathlib import Path
 from typing import Any
 
 import attr
+import attrs
 import cattrs
 from cattrs.converters import Converter
 from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
 from ruamel.yaml import YAML
-from ruamel.yaml.main import YAML
-from typing_extensions import Any
 from useful_types import SequenceNotStr as Sequence
 
 from ahooks._exceptions import PreCommitYamlValidationError
@@ -115,7 +114,8 @@ class RepoConfigBlock:
     repo: str = attr.field(default="local")
     hooks: list[HookConfigBlock] = attr.field(factory=list)
 
-    def add_hook(self, hook: HookConfigBlock):
+    def add_hook(self, hook: HookConfigBlock) -> None:
+        """Append a hook to the end of the hook list"""
         self.hooks.append(hook)
 
 
@@ -139,7 +139,7 @@ class HookConfigBlock:
     stages: tuple[GitStage, ...] | None = attr.field(default=None)
 
     _repo: RepoConfigBlock = attr.field(
-        factory=lambda: _module_precommit_repo, metadata={"omit": True}
+        factory=lambda: _module_precommit_repo, metadata={"omit": True}, alias="_repo"
     )
     _funcs: set[Callable[..., Any]] = attr.field(
         factory=set, init=False, repr=False, metadata={"omit": True}
@@ -155,13 +155,15 @@ class HookConfigBlock:
         return func
 
 
-def _omit_unstructurer(cls, conv: cattrs.Converter) -> Callable[..., dict[str, Any]]:
+def _omit_unstructurer(
+    cls: type, conv: cattrs.Converter
+) -> Callable[..., dict[str, Any]]:
     """Omit if field metadata says to"""
     fn: Callable[[Any], dict[str, Any]] = make_dict_unstructure_fn(
         cls, conv, _cattrs_omit_if_default=True
     )
 
-    def wrapped(inst) -> dict[str, Any]:
+    def wrapped(inst: attrs.AttrsInstance) -> dict[str, Any]:
         d = fn(inst)
         return {
             k: v
@@ -220,7 +222,7 @@ def get_ahook_config(*hook_choices: HookChoice) -> PreCommitConfigYaml:
     """Create a config yaml from this package's hooks"""
     if hook_choices:
         choice_set = set(hook_choices)
-        filtered_hooks = [h for h in _module_precommit_repo.hooks if h in choice_set]
+        filtered_hooks = [h for h in _module_precommit_repo.hooks if h.id in choice_set]
         filtered_repo = RepoConfigBlock(hooks=filtered_hooks)
         return PreCommitConfigYaml(repos=[filtered_repo])
     else:
