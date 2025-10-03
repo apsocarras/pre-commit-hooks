@@ -70,33 +70,27 @@ class PreCommitConfigYaml:
         repo_name = repo_block.repo
         hooks = repo_block.hooks
 
-        def _find_repo_and_append() -> OpSentinel:
-            try:
-                idx = next(
-                    n for n, r in enumerate(self.repos) if _matches_name(repo_name, r)
+        try:
+            idx = next(
+                n for n, r in enumerate(self.repos) if _matches_name(repo_name, r)
+            )
+        except StopIteration:
+            idx = max(len(self.repos) - 1, 0)
+
+        exist_hooks: list[HookConfigBlock] = self.repos[idx].hooks
+        exist_hook_ids = {h.id for h in exist_hooks}
+        for h in hooks:
+            if h.id in exist_hook_ids:
+                warnings.warn(
+                    f"Provided yaml already has a hook named {h.id}. Skipping.",
+                    stacklevel=2,
                 )
-                exist_hooks: list[HookConfigBlock] = self.repos[idx].hooks
-                exist_hook_ids = {h.id for h in exist_hooks}
-                for h in hooks:
-                    if h.id in exist_hook_ids:
-                        warnings.warn(
-                            f"Provided yaml already has a hook named {h.id}. Skipping.",
-                            stacklevel=2,
-                        )
-                        continue
-                    exist_hooks.append(h)
-                if len(exist_hook_ids) == len(exist_hooks):
-                    return FAILED_OP
-                else:
-                    return FINISH_OP
-            except StopIteration:
-                return FAILED_OP
-
-        if _find_repo_and_append():
+                continue
+            exist_hooks.append(h)
+        if len(exist_hook_ids) == len(exist_hooks):
+            return FAILED_OP
+        else:
             return FINISH_OP
-
-        self.repos.append(repo_block)
-        return FINISH_OP
 
     def append_hooks(self, repo_name: str, *hooks: HookConfigBlock) -> OpSentinel:
         """Search for repo name in the config yaml and append the given hooks
@@ -111,7 +105,7 @@ class PreCommitConfigYaml:
 class RepoConfigBlock:
     """Repo entry in .pre-commit-config.yaml."""
 
-    repo: str = attr.field(default="local")
+    repo: str
     hooks: list[HookConfigBlock] = attr.field(factory=list)
 
     def add_hook(self, hook: HookConfigBlock) -> None:
@@ -119,7 +113,7 @@ class RepoConfigBlock:
         self.hooks.append(hook)
 
 
-_module_precommit_repo = RepoConfigBlock()
+_module_precommit_repo = RepoConfigBlock(repo="local")
 
 
 @attr.define
@@ -156,11 +150,14 @@ class HookConfigBlock:
 
 
 def _omit_unstructurer(
-    cls: type, conv: cattrs.Converter
+    cls: type,
+    conv: cattrs.Converter,
 ) -> Callable[..., dict[str, Any]]:
     """Omit if field metadata says to"""
     fn: Callable[[Any], dict[str, Any]] = make_dict_unstructure_fn(
-        cls, conv, _cattrs_omit_if_default=True
+        cls,
+        conv,  # _cattrs_omit_if_default=omit_if_default # using custom metadata override
+        _cattrs_omit_if_default=True,
     )
 
     def wrapped(inst: attrs.AttrsInstance) -> dict[str, Any]:
@@ -194,17 +191,23 @@ def _get_converter() -> Converter:
 conv = _get_converter()
 
 
-def dump_config(config: PreCommitConfigYaml, path: Path) -> None:
+def dump_config(config: PreCommitConfigYaml, path: Path, hooks_only: bool) -> None:
     """Dump to yaml"""
     des = conv.unstructure(config)
+
+    if hooks_only:
+        d = {des["repos"][0]["hooks"]}
+    else:
+        d = (
+            {
+                "minimum_pre_commit_version": des["minimum_pre_commit_version"],
+                "repos": des["repos"],
+            }
+            if "minimum_pre_commit_version" in des
+            else des
+        )
     buf: StringIO = io.StringIO()
-    yaml.dump(
-        {
-            "minimum_pre_commit_version": des["minimum_pre_commit_version"],
-            "repos": des["repos"],
-        },
-        buf,
-    )
+    yaml.dump(d, buf)
     write_atomic(path, buf.getvalue())
 
 
@@ -223,18 +226,20 @@ def get_ahook_config(*hook_choices: HookChoice) -> PreCommitConfigYaml:
     if hook_choices:
         choice_set = set(hook_choices)
         filtered_hooks = [h for h in _module_precommit_repo.hooks if h.id in choice_set]
-        filtered_repo = RepoConfigBlock(hooks=filtered_hooks)
+        filtered_repo = RepoConfigBlock(repo="local", hooks=filtered_hooks)
         return PreCommitConfigYaml(repos=[filtered_repo])
     else:
         return PreCommitConfigYaml(repos=[_module_precommit_repo])
 
 
-def dump_ahook_config(path: Path, *hooks: HookChoice) -> OpSentinel:
+def dump_ahook_config(
+    path: Path, hooks_only: bool = False, *hooks: HookChoice
+) -> OpSentinel:
     """Open the config yaml and append the packages's hooks (if the file exists) or create a new config.yaml"""
     module_config: PreCommitConfigYaml = get_ahook_config(*hooks)
 
     if not path.exists():
-        dump_config(module_config, path)
+        dump_config(module_config, path, hooks_only)
         return FINISH_OP
 
     user_config: PreCommitConfigYaml = load_config(path)
@@ -243,5 +248,5 @@ def dump_ahook_config(path: Path, *hooks: HookChoice) -> OpSentinel:
     if not append_result:
         return FAILED_OP
     else:
-        dump_config(user_config, path)
+        dump_config(user_config, path, hooks_only)
     return FINISH_OP

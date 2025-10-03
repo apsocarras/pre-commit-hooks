@@ -1,7 +1,8 @@
----
-minimum_pre_commit_version: 3.0.0
+minimum_pre_commit_version: "3.0.0"
+
 repos:
-  - hooks:
+  - repo: local
+    hooks:
       - id: block-manual-req-edits
         name: Block manual edits to requirements.txt
         language: system
@@ -9,6 +10,7 @@ repos:
         pass_filenames: false
         files: ^requirements\.txt$
         stages: [commit, push]
+
       - id: emit-requirements
         name: Emit requirements.txt from pyproject.toml using `uv`
         language: system
@@ -16,19 +18,22 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|requirements\.txt)$
         stages: [commit, push]
+
       - id: env-skeleton
         name: Create an example `.env` file with only the names of variables
         language: system
         entry: python -m ahooks.env_skeleton
-        args: [' . ', .env, ' . ']
         pass_filenames: false
+        args: [".", ".env", "."]
         stages: [commit, push]
+
       - id: add-from-future
         name: Add `from __future__ import annotations` to `.py` files.
         language: python
         entry: python -m ahooks.add_from_future
-        args: [-ds]
         pass_filenames: false
+        args: ["-ds"]
         files: ^.*\.py$
         stages: [commit]
-...
+        additional_dependencies:
+          - -e .

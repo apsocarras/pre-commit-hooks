@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import Callable
 from pathlib import Path
 
 import click
@@ -58,9 +60,17 @@ _MODULE_CHOICES: tuple[HookChoice, ...] = (
     help="Path to the to the pre-commit config. If it exists, the hooks will be inserted into it.",
     default=None,
 )
+@click.option(
+    "-h",
+    "hooks_only",
+    is_flag=True,
+    help="Whether to export the hook to a `.pre-commit-hooks.yaml` and exclude the config metadata",
+    default=False,
+)
 def export(
     hooks: tuple[HookChoice, ...] = (),
     config_path: Path | None = None,
+    hooks_only: bool = False,
 ) -> None:
     """Export the hooks in this package to a `pre-commit-config.yaml`
 
@@ -71,12 +81,18 @@ def export(
         Path to the to the pre-commit config. If it exists, the hooks will be inserted into it.
 
     """
-    if config_path is not None:
-        _res_path = config_path
-    else:
-        _res_path = Path.cwd() / ".pre-commit-config.yaml"
+    path_base: Callable[[Path], str] = (
+        lambda p: re.sub("config", "hooks", p.name) if hooks_only else p.name
+    )
 
-    if dump_ahook_config(_res_path, *hooks):
+    if config_path is not None:
+        _res_path = config_path / path_base(config_path)
+    else:
+        _res_path = Path.cwd() / (
+            f".pre-commit-{'config' if not hooks_only else 'hooks'}.yaml"
+        )
+
+    if dump_ahook_config(_res_path, hooks_only, *hooks):
         click.echo(f"Wrote hooks to {_res_path}")
     else:
         click.echo(

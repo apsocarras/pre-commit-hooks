@@ -1,7 +1,8 @@
 ---
 minimum_pre_commit_version: 3.0.0
 repos:
-  - hooks:
+  - repo: local
+    hooks:
       - id: block-manual-req-edits
         name: Block manual edits to requirements.txt
         language: system
@@ -20,7 +21,7 @@ repos:
         name: Create an example `.env` file with only the names of variables
         language: system
         entry: python -m ahooks.env_skeleton
-        args: [' . ', .env, ' . ']
+        args: [., .env, .]
         pass_filenames: false
         stages: [commit, push]
       - id: add-from-future
