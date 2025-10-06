@@ -16,6 +16,7 @@ import cattrs
 from cattrs.converters import Converter
 from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
 from ruamel.yaml import YAML
+from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
 from ahooks._exceptions import PreCommitYamlValidationError
@@ -99,6 +100,17 @@ class PreCommitConfigYaml:
         - Else, adds another block at the end of the yaml
         """
         return self.extend(RepoConfigBlock(repo_name, list(hooks)))
+
+    @override
+    def __eq__(self, o: object) -> bool:
+        """Compares all blocks in each yaml file, ignoring sort order"""
+        if not isinstance(o, PreCommitConfigYaml) or not len(o.repos) == len(
+            self.repos
+        ):
+            return False
+        _s = sorted(self.repos, key=lambda r: r.repo)
+        _o = sorted(o.repos, key=lambda r: r.repo)
+        return all(s == o for s, o in zip(_s, _o, strict=False))
 
 
 @attr.define
@@ -217,6 +229,16 @@ def load_config(path: Path) -> PreCommitConfigYaml:
         with path.open("r") as file:
             config = yaml.load(file)
         return conv.structure(config, PreCommitConfigYaml)
+    except cattrs.BaseValidationError as e:
+        raise PreCommitYamlValidationError() from e
+
+
+def load_hooks(path: Path) -> list[HookConfigBlock]:
+    """Load a .pre-commit-hooks.yaml as a list of hooks"""
+    try:
+        with path.open("r") as file:
+            hooks = yaml.load(file)
+        return conv.structure(hooks, list[HookConfigBlock])
     except cattrs.BaseValidationError as e:
         raise PreCommitYamlValidationError() from e
 

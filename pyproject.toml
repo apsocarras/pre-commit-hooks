@@ -27,6 +27,7 @@ test = [
     "ahooks",
     "beartype>=0.21.0",
     "coverage>=7.10.7",
+    "hypothesis>=6.140.3",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "pytest-git>=1.8.0",
@@ -65,7 +66,7 @@ ignore_missing_imports = true
 extend-exclude = [
     "deprecated/", 
     "libs/",
-    "_local/"
+    "_local/",
 ]
 unsafe-fixes = true
 line-length = 88
@@ -134,7 +135,7 @@ fixable = ["ALL"]
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S603"]
+"tests/*" = ["S101", "S603", "D100", "D103"]
 
 
 [tool.ruff.lint.isort]

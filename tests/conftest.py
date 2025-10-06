@@ -46,3 +46,12 @@ def expected_ahook_yaml() -> YamlFile:
     with path.open("r") as file:
         data = yaml.load(file)
     return YamlFile(path, data)
+
+
+@pytest.fixture(scope="session")
+def expected_ahook_just_hooks_yaml() -> YamlFile:
+    """Expected format of the `.pre-commit-hooks.yaml` output by `ahook.export.py`"""
+    path = Path(__file__).parent / ".test.pre-commit-hooks.yaml"
+    with path.open("r") as file:
+        data = yaml.load(file)
+    return YamlFile(path, data)
