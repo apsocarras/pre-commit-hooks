@@ -24,8 +24,8 @@ from ahooks.utils._click_utils import (
 )
 from ahooks.utils.preCommitConfigYaml import HookConfigBlock as cb
 
-from .utils._file_utils import write_, write_if_changed
-from .utils.git_utils import check_ignored, find_repo_root
+from ..utils._file_utils import write_, write_if_changed
+from ..utils.git_utils import check_ignored, find_repo_root
 
 
 def raise_if_git_ignored(git_root: Path, skelenv_path: Path) -> None:

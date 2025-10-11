@@ -28,7 +28,7 @@ from ahooks.utils._click_utils import (
     stage_if_true,
 )
 
-from .utils import HookConfigBlock as cb
+from ..utils import HookConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 
