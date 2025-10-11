@@ -1,0 +1,31 @@
+---
+  - id: add-from-future
+    name: Add `from __future__ import annotations` to `.py` files.
+    language: python
+    entry: python -m ahooks.add_from_future
+    args: [-ds]
+    pass_filenames: false
+    files: ^.*\.py$
+    stages: [pre-commit]
+  - id: block-manual-req-edits
+    name: Block manual edits to requirements.txt
+    language: system
+    entry: "\n     bash -c\n            if git diff --cached --name-only | grep -q \"^requirements\\.txt$\" &&\n                ! git diff --cached --name-only | grep -q \"^pyproject\\.toml$\"; then\n                echo \"Edit pyproject.toml and run the emitter; don't hand-edit requirements.txt.\"\n                exit 1\n            fi\n    "
+    pass_filenames: false
+    files: ^requirements\.txt$
+    stages: [pre-commit, pre-push]
+  - id: emit-requirements
+    name: Emit requirements.txt from pyproject.toml using `uv`
+    language: system
+    entry: python -m ahooks.emit_requirements
+    pass_filenames: false
+    files: ^(pyproject\.toml|requirements\.txt)$
+    stages: [pre-commit, pre-push]
+  - id: env-skeleton
+    name: Create an example `.env` file with only the names of variables
+    language: system
+    entry: python -m ahooks.env_skeleton
+    args: [., .env, .]
+    pass_filenames: false
+    stages: [pre-commit, pre-push]
+...
