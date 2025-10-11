@@ -103,7 +103,7 @@ class PreCommitConfigYaml:
 
     @override
     def __eq__(self, o: object) -> bool:
-        """Compares all blocks in each yaml file, ignoring sort order"""
+        """Compares only repo blocks in each yaml file, ignoring sort order"""
         if not isinstance(o, PreCommitConfigYaml) or not len(o.repos) == len(
             self.repos
         ):
@@ -120,9 +120,25 @@ class RepoConfigBlock:
     repo: str
     hooks: list[HookConfigBlock] = attr.field(factory=list)
 
-    def add_hook(self, hook: HookConfigBlock) -> None:
+    def add_hook(self, hook: HookConfigBlock, guard: bool = False) -> None:
         """Append a hook to the end of the hook list"""
+        if guard and self.has_hook(hook):
+            return
         self.hooks.append(hook)
+
+    def has_hook(self, hook: HookConfigBlock) -> bool:
+        """Checks if a hook of the same id is already in the hook list"""
+        has_ = any(h.id == hook.id for h in self.hooks)
+        logger.debug(msg=tuple(h.id for h in self.hooks))
+        return has_
+
+    @override
+    def __eq__(self, o: object, /) -> bool:
+        if not isinstance(o, RepoConfigBlock) or not len(o.hooks) == len(self.hooks):
+            return False
+        _s = sorted(self.hooks, key=lambda h: h.id)
+        _o = sorted(o.hooks, key=lambda h: h.id)
+        return all(s == o for s, o in zip(_s, _o, strict=False))
 
 
 _module_precommit_repo = RepoConfigBlock(repo="local")
@@ -153,12 +169,17 @@ class HookConfigBlock:
 
     def __attrs_post_init__(self) -> None:
         """Registers self with the passed repo config block"""
-        self._repo.add_hook(self)
+        self._repo.add_hook(self, guard=True)
 
     def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
         """Registers the function with itself (and by extension its repo member)"""
         self._funcs.add(func)
         return func
+
+    @override
+    def __eq__(self, o: object, /) -> bool:
+        """Only compares id parameter (for my purposes this is sufficient)"""
+        return isinstance(o, HookConfigBlock) and o.id == self.id
 
 
 def _omit_unstructurer(
@@ -208,7 +229,7 @@ def dump_config(config: PreCommitConfigYaml, path: Path, hooks_only: bool) -> No
     des = conv.unstructure(config)
 
     if hooks_only:
-        d = {des["repos"][0]["hooks"]}
+        d = des["repos"][0]["hooks"]
     else:
         d = (
             {
@@ -238,9 +259,12 @@ def load_hooks(path: Path) -> list[HookConfigBlock]:
     try:
         with path.open("r") as file:
             hooks = yaml.load(file)
-        return conv.structure(hooks, list[HookConfigBlock])
+        x: list[HookConfigBlock] = conv.structure(hooks, list[HookConfigBlock])
+        return x
     except cattrs.BaseValidationError as e:
         raise PreCommitYamlValidationError() from e
+    except Exception:
+        raise
 
 
 def get_ahook_config(*hook_choices: HookChoice) -> PreCommitConfigYaml:
@@ -264,7 +288,14 @@ def dump_ahook_config(
         dump_config(module_config, path, hooks_only)
         return FINISH_OP
 
-    user_config: PreCommitConfigYaml = load_config(path)
+    if not hooks_only:
+        user_config: PreCommitConfigYaml = load_config(path)
+    else:
+        # lazily reusing same functions by wrapping hooks inside config yaml
+        user_hooks = load_hooks(path)
+        user_repo = RepoConfigBlock("local", user_hooks)
+        user_config = PreCommitConfigYaml(repos=[user_repo])
+
     append_result: OpSentinel = user_config.extend(repo_block=module_config.repos[0])
 
     if not append_result:

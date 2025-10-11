@@ -54,6 +54,20 @@
             }
         },
         {
+        "name": "Pytest: SRC debug export_test main",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pytest",
+        "args": ["-k", "export_test and test_export_given_hooks"],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env",
+        "justMyCode": true, 
+           "env": {
+            "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
         "name": "Python: Run add_from_future.py",
         "type": "debugpy",
         "request": "launch",

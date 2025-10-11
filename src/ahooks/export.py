@@ -86,7 +86,7 @@ def export(
     )
 
     if config_path is not None:
-        _res_path = config_path / path_base(config_path)
+        _res_path = config_path.parent / path_base(config_path)
     else:
         _res_path = Path.cwd() / (
             f".pre-commit-{'config' if not hooks_only else 'hooks'}.yaml"

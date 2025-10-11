@@ -23,7 +23,10 @@ class NodeLoc(NamedTuple):
 
 
 HookChoice: TypeAlias = Union[
-    Literal["add-from-future"], Literal["env-skeleton"], Literal["emit-requirements"]
+    Literal["add-from-future"],
+    Literal["env-skeleton"],
+    Literal["emit-requirements"],
+    Literal["block-manual-req-edits"],
 ]
 
 
