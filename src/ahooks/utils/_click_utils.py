@@ -6,7 +6,7 @@ from subprocess import CompletedProcess
 import click
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks.utils.git_utils import git_add
+from .git_utils import git_add
 
 
 class NotInstalledException(click.ClickException):

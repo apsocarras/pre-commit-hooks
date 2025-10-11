@@ -11,12 +11,11 @@ import click
 from ruamel.yaml import YAML
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks.utils._click_utils import WRITE_FILE_TYPE
-from ahooks.utils.preCommitConfigYaml import dump_ahook_config
-
 from ._types import (
     HookChoice,
 )
+from .utils._click_utils import WRITE_FILE_TYPE
+from .utils.preCommitConfigYaml import dump_ahook_config
 
 logger = logging.getLogger(__name__)
 

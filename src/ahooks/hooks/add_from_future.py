@@ -22,8 +22,7 @@ from typing import cast
 import click
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks._types import NodeLoc
-
+from .._types import NodeLoc
 from ..utils import HookConfigBlock as cb
 from ..utils._click_utils import READ_DIR_TYPE, stage_if_true
 from ..utils.git_utils import (

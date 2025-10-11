@@ -22,13 +22,12 @@ from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
 )
 
-from ahooks.utils._click_utils import (
+from ..utils import HookConfigBlock as cb
+from ..utils._click_utils import (
     NotInstalledException,
     raise_if_return_code,
     stage_if_true,
 )
-
-from ..utils import HookConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 

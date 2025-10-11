@@ -19,9 +19,7 @@ from ruamel.yaml import YAML
 from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks._exceptions import PreCommitYamlValidationError
-from ahooks.utils._file_utils import write_atomic
-
+from .._exceptions import PreCommitYamlValidationError
 from .._types import (
     FAILED_OP,
     FINISH_OP,
@@ -31,6 +29,7 @@ from .._types import (
     P,
     R,
 )
+from ..utils._file_utils import write_atomic
 
 logger = logging.getLogger(__name__)
 
