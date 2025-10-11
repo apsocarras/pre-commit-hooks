@@ -10,5 +10,5 @@ repos:
         args: ["-h"]
         pass_filenames: false
         files: ^hooks/.*\.py$
-        stages: [commit, push]
+        stages: [pre-commit, pre-push]
         always_run: true
