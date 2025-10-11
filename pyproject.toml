@@ -8,6 +8,7 @@ dependencies = [
     "attrs>=25.3.0",
     "cattrs>=25.2.0",
     "click>=8.1.8",
+    "rich>=14.2.0",
     "ruamel-yaml>=0.18.15",
     "tomli>=2.2.1",
     "typing-extensions>=4.15.0",
