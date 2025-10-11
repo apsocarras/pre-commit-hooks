@@ -93,10 +93,10 @@ def export(
         )
 
     if dump_ahook_config(_res_path, hooks_only, *hooks):
-        click.echo(f"Wrote hooks to {_res_path}")
+        click.echo(f"\nWrote hooks to {_res_path}")
     else:
         click.echo(
-            f"Added no hooks to {_res_path} (hook ids already present in config.)"
+            f"\nAdded no hooks to {_res_path.name} (hook ids already present in config)"
         )
 
 

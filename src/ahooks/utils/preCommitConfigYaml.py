@@ -80,14 +80,19 @@ class PreCommitConfigYaml:
 
         exist_hooks: list[HookConfigBlock] = self.repos[idx].hooks
         exist_hook_ids = {h.id for h in exist_hooks}
+        dups = []
         for h in hooks:
             if h.id in exist_hook_ids:
-                warnings.warn(
-                    f"Provided yaml already has a hook named {h.id}. Skipping.",
-                    stacklevel=2,
-                )
+                dups.append(h.id)
                 continue
             exist_hooks.append(h)
+        if dups:
+            lines = "\n- ".join(dups)
+            warnings.warn(
+                f"Provided yaml already has hooks:\n- {lines}.",
+                stacklevel=2,
+            )
+
         if len(exist_hook_ids) == len(exist_hooks):
             return FAILED_OP
         else:
