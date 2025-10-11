@@ -1,4 +1,4 @@
-"""Add `from __future__ import annotations` to `.py` files.
+r"""Add `from __future__ import annotations` to `.py` files.
 
 This statement tells the interpreter to treat type hints as string literals,
 improving forwards/backwards compatibility between python versions
@@ -8,26 +8,26 @@ and simplifying some solutions for achieving type-safety.
     - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
     - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
         https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
+    - Note the custom filtering I wrote is superfluous with `files=r"^.*\.py$"` and `pass filenames`
+     (why did I write this...though this does let you run it as a CLI independent of pre-commit)
 """
 
 from __future__ import annotations
 
 import ast
-import logging
 from collections.abc import Collection
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import cast
 
 import click
+from useful_types import SequenceNotStr as Sequence
 
-from .utils import PreCommitConfigBlock as cb
-from .utils._click_utils import READ_DIR_TYPE, stage_if_true
-from .utils.git_utils import (
+from .._types import NodeLoc
+from ..utils import HookConfigBlock as cb
+from ..utils._click_utils import READ_DIR_TYPE, stage_if_true
+from ..utils.git_utils import (
     iter_py_filtered,
 )
-
-logger = logging.getLogger(__name__)
-
 
 FROM_FUTURE = "from __future__ import annotations"
 
@@ -42,12 +42,7 @@ IGNORE_DIRS = frozenset[str](
 )
 
 
-class _NodeLoc(NamedTuple):
-    idx: int
-    lineno: int
-
-
-def find_insertion_point(mod: ast.Module) -> _NodeLoc | None:
+def find_insertion_point(mod: ast.Module) -> NodeLoc | None:
     """Locate where to insert the import statement in the `.py` file
 
     Assumes:
@@ -65,17 +60,17 @@ def find_insertion_point(mod: ast.Module) -> _NodeLoc | None:
     for idx, node in enumerate(mod.body):
         if isinstance(node, ast.ImportFrom):
             if node.module == "__future__":
-                return
-            return _NodeLoc(
+                return None
+            return NodeLoc(
                 idx,
                 node.lineno + docstring_offset,
             )
     idx = 0 if not ast.get_docstring(mod) else 1
 
-    return _NodeLoc(idx, docstring_offset)
+    return NodeLoc(idx, docstring_offset)
 
 
-def _rewrite_file_with_future(src_code: str, path: Path, loc: _NodeLoc) -> None:
+def _rewrite_file_with_future(src_code: str, path: Path, loc: NodeLoc) -> None:
     # Add preceding newline only if it's not the first node (i.e. if module has a docstring)
     from_future = f"\n{FROM_FUTURE}\n" if loc.idx != 0 else f"{FROM_FUTURE}\n\n"
     lines = src_code.splitlines(keepends=True)
@@ -87,7 +82,7 @@ def _rewrite_file_with_future(src_code: str, path: Path, loc: _NodeLoc) -> None:
 def _add_statement(path: Path) -> Path | None:
     src_code = path.read_text(encoding="utf-8")
     mod = ast.parse(src_code, filename=str(path))
-    loc: _NodeLoc | None = find_insertion_point(mod)
+    loc: NodeLoc | None = find_insertion_point(mod)
     if loc is None:
         return None
     _rewrite_file_with_future(src_code, path, loc)
@@ -105,17 +100,17 @@ def _add_statement(path: Path) -> Path | None:
     language="python",
     entry="python -m ahooks.add_from_future",
     pass_filenames=False,
-    stages=["pre-commit"],
-    args=["-ds"],
+    stages=("pre-commit",),
+    args=("-ds",),
     files=r"^.*\.py$",
 )
-def main(
+def add_from_future(
     proj_root: Path,
     ignores: Collection[Path] = (),
     diff_filter_staging: bool = True,
     ignore_by_gitignore: bool = False,
 ) -> None:
-    """Add `from __future__ import annotations` to `.py` files.
+    r"""Add `from __future__ import annotations` to `.py` files.
 
     This statement tells the interpreter to treat type hints as string literals,
     improving forwards/backwards compatibility between python versions
@@ -125,6 +120,8 @@ def main(
         - Note that PEP 649 will make this statement obsolete (see: https://peps.python.org/pep-0649/)
         - Note also that `ruff` can do this for you with `required-imports` (why did I write this...)
             https://stackoverflow.com/questions/77680073/ignore-specific-rules-in-specific-directory-with-ruff
+    - Note the custom filtering I wrote is superfluous with `files=r"^.*\.py$"` and `pass filenames`
+     (why did I write this...though this does let you run it as a CLI independent of pre-commit)
 
     Arguments:
         proj_root : Path
@@ -157,4 +154,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    add_from_future()

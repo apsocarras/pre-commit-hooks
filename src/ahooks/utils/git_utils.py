@@ -5,18 +5,19 @@ from __future__ import annotations
 
 import subprocess
 import warnings
-from collections.abc import Collection, Iterable
+from collections.abc import Callable, Collection, Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Callable, Literal, TypeVar, Union, cast
+from typing import Annotated, Any, Literal, TypeAlias, TypeVar
 
-from typing_extensions import LiteralString, Self, TypeAlias, override
+from typing_extensions import LiteralString, Self, override
+from useful_types import SequenceNotStr as Sequence
 
 Ignores: TypeAlias = Annotated[
-    Union[Collection[str], Collection[Path]],
+    Collection[str] | Collection[Path],
     "Collection of files or directories for this hook to skip.",
 ]
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 
 class GitSubProcessFailed(Exception):
@@ -45,7 +46,7 @@ class GitSubProcessFailed(Exception):
 
 def run_git(cwd: Path, *args: str) -> str:
     """Main runner for git commands"""
-    res = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    res = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)  # noqa: S607
     if res.returncode != 0:
         raise GitSubProcessFailed(args, res)
     return res.stdout
@@ -125,6 +126,7 @@ def ignore_set(ignores: Ignores, gitignore: Path | None = None) -> frozenset[Pat
 def in_ignore_set(
     p: PathLike, ignores: Ignores, gitignore: PathLike | None = None
 ) -> bool:
+    """Collects the list of igonres and the .gitignore file to determine if p is ignored"""
     path = Path(p)
     ig = ignore_set(tuple(ignores), gitignore)
     return (path in ig) or any(parent in ig for parent in path.parents)
@@ -174,7 +176,7 @@ def iter_py_git_diff(
     """
     repo_root: Path = find_repo_root(root)
 
-    def _cmd(*args: str):
+    def _cmd(*args: str) -> str:
         return run_git(repo_root, "diff", "--name-only", str(diff_filter), *args)
 
     if base:
@@ -278,7 +280,7 @@ def check_ignored(root: Path, ignore: T | Collection[T]) -> set[T]:
     if isinstance(ignore, (Path, str)):
         result = run_git(start, "check-ignore", str(ignore))
         if str(ignore) in result:
-            return {cast(T, ignore)}
+            return {ignore}  # pyright: ignore[reportReturnType]
         return set()
     else:
         result = run_git(start, "check-ignore", *(str(r) for r in ignore))

@@ -18,14 +18,16 @@ from typing import Any, Literal
 
 import click
 import tomli
+from useful_types import (
+    SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
+)
 
-from ahooks.utils._click_utils import (
+from ..utils import HookConfigBlock as cb
+from ..utils._click_utils import (
     NotInstalledException,
     raise_if_return_code,
     stage_if_true,
 )
-
-from .utils import PreCommitConfigBlock as cb
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,7 @@ def _construct_command(dep_type: _TestDepsType | None) -> list[str]:
     files=r"^(pyproject\.toml|requirements\.txt)$",
     stages=("pre-commit", "pre-push"),
 )
-def main() -> None:
+def emit_requirements() -> None:
     """
     Emit `requirements.txt` from a `pyproject.toml` using `uv`
 
@@ -105,10 +107,10 @@ def main() -> None:
 
     dep_type = _get_dep_type(path)
     cmd = _construct_command(dep_type)
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
     raise_if_return_code("`uv pip compile`", result)
     stage_if_true(True, "emit-requirements", path.parent / "requirements.txt")
 
 
 if __name__ == "__main__":
-    main()
+    emit_requirements()

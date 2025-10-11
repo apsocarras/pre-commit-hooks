@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
+
+from useful_types import SequenceNotStr as Sequence
 
 
+@runtime_checkable
 class HasWrite(Protocol):
     """Proto for files or buffer"""
 

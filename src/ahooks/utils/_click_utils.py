@@ -4,8 +4,9 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 import click
+from useful_types import SequenceNotStr as Sequence
 
-from ahooks.utils.git_utils import git_add
+from .git_utils import git_add
 
 
 class NotInstalledException(click.ClickException):
@@ -55,7 +56,7 @@ def _hook_name(s: str) -> str:
     return f"[{s.replace('_', '-')}]"
 
 
-def _stage_msg(hook_name: str, *paths: Path | str):
+def _stage_msg(hook_name: str, *paths: Path | str) -> str:
     return f"{_hook_name(hook_name)} Updated and staged: {', '.join(str(p) for p in paths)}"
 
 

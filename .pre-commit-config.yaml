@@ -1,0 +1,13 @@
+---
+minimum_pre_commit_version: 3.0.0
+repos:
+  - repo: local
+    hooks:
+      - id: export-hooks
+        name: Export .pre-commit-hooks.yaml
+        language: system
+        entry: python -m ahooks.export
+        args: ["-h"]
+        pass_filenames: false
+        files: ^hooks/.*\.py$
+        stages: [pre-commit, pre-push]

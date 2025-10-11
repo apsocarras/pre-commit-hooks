@@ -8,22 +8,23 @@ from __future__ import annotations
 import io
 import os
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Callable
 
 import click
+from useful_types import (
+    SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
+)
 
-from ahooks.utils._click_utils import (
+from ..utils._click_utils import (
     READ_DIR_TYPE,
     READ_FILE_TYPE,
     WRITE_DIR_TYPE,
     stage_if_true,
 )
-from ahooks.utils.preCommitConfigBlock import PreCommitConfigBlock as cb
-
-from .utils._file_utils import write_, write_if_changed
-from .utils.git_utils import check_ignored, find_repo_root
+from ..utils._file_utils import write_, write_if_changed
+from ..utils.git_utils import check_ignored, find_repo_root
+from ..utils.preCommitConfigYaml import HookConfigBlock as cb
 
 
 def raise_if_git_ignored(git_root: Path, skelenv_path: Path) -> None:
@@ -84,7 +85,7 @@ def build_skeleton(base_env_path: Path) -> str:
     args=(".", ".env", "."),
     stages=("pre-commit", "pre-push"),
 )
-def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
+def env_skeleton(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
     """Create an example `.env` file with only the names of variables.
 
     Keeps a Git-safe record of what .env vars you may set for the project.
@@ -99,4 +100,4 @@ def main(git_repo_root: Path, base_env_path: Path, skelenv_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    env_skeleton()

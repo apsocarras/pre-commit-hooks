@@ -1,5 +1,17 @@
+"""
+Yes, the dreaded "`utils`" folder.
+
+I trust that the files themselves are named well enough.
+"""
+
 from __future__ import annotations
 
-from ._preCommitConfigBlock import PreCommitConfigBlock
+from useful_types import SequenceNotStr as Sequence
 
-__all__ = ["PreCommitConfigBlock"]
+from .preCommitConfigYaml import HookConfigBlock, PreCommitConfigYaml, RepoConfigBlock
+
+__all__ = [
+    "HookConfigBlock",
+    "PreCommitConfigYaml",
+    "RepoConfigBlock",
+]

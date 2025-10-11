@@ -3,11 +3,16 @@ name = "ahooks"
 version = "0.1.0"
 description = "Single python package for all the pre-commit hooks I use."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
+    "attrs>=25.3.0",
+    "cattrs>=25.2.0",
     "click>=8.1.8",
+    "rich>=14.2.0",
+    "ruamel-yaml>=0.18.15",
     "tomli>=2.2.1",
     "typing-extensions>=4.15.0",
+    "useful-types>=0.2.1",
 ]
 
 [dependency-groups]
@@ -20,9 +25,13 @@ dev = [
     "ruff>=0.13.2",
 ]
 test = [
+    "ahooks",
+    "beartype>=0.21.0",
     "coverage>=7.10.7",
+    "hypothesis>=6.140.3",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+    "pytest-git>=1.8.0",
     "python-dotenv>=1.1.1",
 ]
 
@@ -58,12 +67,12 @@ ignore_missing_imports = true
 extend-exclude = [
     "deprecated/", 
     "libs/",
-    "_local/"
+    "_local/",
 ]
 unsafe-fixes = true
 line-length = 88
 
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -117,18 +126,24 @@ ignore=[
     # First line should end with a period, question mark, or exclamation point
     "D415",
     # Ambiguous name
-    "E741"
+    "E741",
+    "UP007",
+    "UP045"
+
 ]
 future-annotations = true
 fixable = ["ALL"]
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S603"]
+"tests/*" = ["S101", "S603", "D100", "D103"]
+
 
 [tool.ruff.lint.isort]
-required-imports = ["from __future__ import annotations"]
-
+required-imports = [
+    "from __future__ import annotations",
+    "from useful_types import SequenceNotStr as Sequence # noqa: F401"
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -136,3 +151,6 @@ ignore-decorators = [
     "typing.overload", 
     "typing_extensions.overload"
 ]
+
+[tool.uv.sources]
+ahooks = { workspace = true }
