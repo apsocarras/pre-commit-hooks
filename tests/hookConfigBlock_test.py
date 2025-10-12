@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks._types import HookChoice
+from ahooks._types import HookChoice, iter_hook_choices
 from ahooks.models import HookConfigBlock as hb
 from ahooks.models import RepoConfigBlock as r
 
@@ -50,7 +50,7 @@ def test_module_repo_has_hook_decorators(
             expected_len = 1
         case None:
             module_config = get_ahook_config()
-            expected_len = 4  # len(_MODULE_CHOICES) + 1 for block-manual-req-edits
+            expected_len = len(tuple(iter_hook_choices()))
         case _:
             module_config = get_ahook_config(*hooks)
             expected_len = len(hooks)

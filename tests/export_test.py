@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import typing
 import uuid
 from collections.abc import Collection, Iterable
 from itertools import chain
@@ -19,7 +18,7 @@ from ruamel.yaml import YAML
 from typing_extensions import NotRequired, Unpack
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks._types import HookChoice
+from ahooks._types import HookChoice, iter_hook_choices
 from ahooks.export import export
 from ahooks.models import (
     HookConfigBlock,
@@ -88,8 +87,7 @@ def _call_export(**kwargs: Unpack[_CallExportKwargs]) -> Result:
 
 
 def _iter_hook_choices() -> Iterable[HookChoice]:
-    for lit in typing.get_args(HookChoice):
-        yield typing.get_args(lit)[0]
+    return iter_hook_choices()
 
 
 def _ahook_runner(config: PreCommitConfigYaml, *obj: HookChoice) -> None:

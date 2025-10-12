@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+import typing
+from collections.abc import Collection, Iterable
 from typing import (
     Literal,
     NamedTuple,
@@ -30,10 +31,16 @@ class NodeLoc(NamedTuple):
 
 HookChoice: TypeAlias = Union[
     Literal["add-from-future"],
+    Literal["allow-unused-required-imports"],
     Literal["env-skeleton"],
     Literal["emit-requirements"],
     Literal["block-manual-req-edits"],
 ]
+
+
+def iter_hook_choices() -> Iterable[HookChoice]:
+    for lit in typing.get_args(HookChoice):
+        yield typing.get_args(lit)[0]
 
 
 class FalseySentinel(Sentinel):

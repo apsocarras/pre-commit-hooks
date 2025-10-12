@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 import click
 import libcst as cst
@@ -99,15 +99,24 @@ def _line_of(node: cst.CSTNode, get_meta) -> SimpleStatementLine | None:
     return _walk_back(node, get_meta, cst.SimpleStatementLine)
 
 
-def _get_trailing(node: _T_Import, get_meta) -> TrailingWhitespace | None:
+P = ParamSpec("P")
+WhiteSpaceFinder = Callable[P, TrailingWhitespace | None]
+
+
+def _get_trailing(
+    node: cst.Import | cst.ImportFrom, get_meta
+) -> TrailingWhitespace | None:
     enclosing_line: SimpleStatementLine | None = _line_of(node, get_meta)
     if enclosing_line is None:
         return None
     return enclosing_line.trailing_whitespace
 
 
-def _is_missing_whitelist_comment(node: _T_Import, get_meta) -> bool:
-    trailing = _get_trailing(node, get_meta)
+def _is_missing_whitelist_comment(
+    node: _T_Import,
+    get_trailing: WhiteSpaceFinder[_T_Import],
+) -> bool:
+    trailing = get_trailing(node)
     return (
         trailing is None
         or not trailing.comment
@@ -116,42 +125,48 @@ def _is_missing_whitelist_comment(node: _T_Import, get_meta) -> bool:
 
 
 def _import_needs_whitelist(
-    node: cst.Import, get_meta, required_imports: frozenset[str]
+    node: cst.Import,
+    get_trailing: WhiteSpaceFinder[cst.Import],
+    required_imports: frozenset[str],
 ) -> bool:
     return any(
         name in required_imports for name in _node_names(node)
-    ) and _is_missing_whitelist_comment(node, get_meta)
+    ) and _is_missing_whitelist_comment(node, get_trailing)
 
 
 def _importFrom_needs_whitelist(
-    node: cst.ImportFrom, get_meta, required_imports: frozenset[str]
+    node: cst.ImportFrom,
+    get_trailing: WhiteSpaceFinder[cst.ImportFrom],
+    required_imports: frozenset[str],
 ) -> bool:
     if not isinstance(node.module, cst.Name):
         return False
     modname = node.module.value
-    return modname in required_imports and _is_missing_whitelist_comment(node, get_meta)
+    return modname in required_imports and _is_missing_whitelist_comment(
+        node, get_trailing
+    )
 
 
 def _register_import(
     node: cst.Import,
-    get_meta,
+    get_trailing: WhiteSpaceFinder[cst.Import],
     required_imports: frozenset[str],
     register: Callable[[SimpleStatementLine | None], Any],
 ) -> None:
     """Mark an Import's enclosing simple line statement as needing a whitelist comment."""
-    if _import_needs_whitelist(node, get_meta, required_imports):
+    if _import_needs_whitelist(node, get_trailing, required_imports):
         enclosure = _line_of(node, get_meta)
         register(enclosure)
 
 
 def _register_importFrom(
     node: cst.ImportFrom,
-    get_meta,
+    get_trailing: WhiteSpaceFinder[cst.ImportFrom],
     required_imports: frozenset[str],
     register: Callable[[SimpleStatementLine | None], Any],
 ) -> None:
     """Mark an ImportFrom's enclosing simple line statement as needing a whitelist comment."""
-    if _importFrom_needs_whitelist(node, get_meta, required_imports):
+    if _importFrom_needs_whitelist(node, get_trailing, required_imports):
         enclosure = _line_of(node, get_meta)
         register(enclosure)
 
@@ -174,6 +189,9 @@ class _AppendWhiteListComment(cst.CSTTransformer):
     def get_meta(self, provider, node):
         return self.get_metadata(provider, node)
 
+    def get_trailing(self, node) -> TrailingWhitespace | None:
+        return _get_trailing(node, self.get_meta)
+
     def register_line(self, line: SimpleStatementLine | None) -> None:
         if line is not None:
             return self._line_registry.add(id(line))
@@ -184,12 +202,14 @@ class _AppendWhiteListComment(cst.CSTTransformer):
     @override
     def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
         _register_importFrom(
-            node, self.get_meta, self.required_imports, self.register_line
+            node, self.get_trailing, self.required_imports, self.register_line
         )
 
     @override
     def visit_Import(self, node: cst.Import) -> None:
-        _register_import(node, self.get_meta, self.required_imports, self.register_line)
+        _register_import(
+            node, self.get_trailing, self.required_imports, self.register_line
+        )
 
     @override
     def leave_SimpleStatementLine(

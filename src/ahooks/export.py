@@ -13,6 +13,7 @@ from useful_types import SequenceNotStr as Sequence
 
 from ._types import (
     HookChoice,
+    iter_hook_choices,
 )
 from .models.converters import dump_ahook_config
 from .utils._click_utils import WRITE_FILE_TYPE
@@ -24,11 +25,7 @@ yaml = YAML()
 
 
 # fmt: off
-_MODULE_CHOICES: tuple[HookChoice, ...] = (
-    "add-from-future",
-    "env-skeleton",
-    "emit-requirements"
-)
+_MODULE_CHOICES: tuple[HookChoice, ...] = tuple(iter_hook_choices())
 # fmt: on
 
 
