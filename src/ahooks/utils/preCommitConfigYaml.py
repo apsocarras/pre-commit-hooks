@@ -8,7 +8,7 @@ import warnings
 from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import attr
 import attrs
@@ -19,6 +19,7 @@ from ruamel.yaml import YAML
 from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
+from ...ahooks import nobeartype
 from .._exceptions import PreCommitYamlValidationError
 from .._types import (
     FAILED_OP,
@@ -197,7 +198,13 @@ def _omit_unstructurer(
         _cattrs_omit_if_default=True,
     )
 
-    def wrapped(inst: attrs.AttrsInstance) -> dict[str, Any]:
+    @nobeartype
+    def wrapped(
+        inst: Annotated[
+            attrs.AttrsInstance,
+            "`attrs.AttrsInstance` is an empty protocol and not a real runtime type.",
+        ],
+    ) -> dict[str, Any]:
         d = fn(inst)
         return {
             k: v

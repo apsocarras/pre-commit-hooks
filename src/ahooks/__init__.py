@@ -13,6 +13,7 @@ import sys
 import warnings
 
 from beartype.claw import beartype_this_package
+from nobeartype import NoBearType
 from rich.console import Console
 from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport] # TODO: add a gitcommit hook to append a pyright comment on any required imports in pyproject.toml
@@ -29,3 +30,4 @@ warnings.showwarning = _rich_warning
 
 
 beartype_this_package()
+nobeartype = NoBearType()
