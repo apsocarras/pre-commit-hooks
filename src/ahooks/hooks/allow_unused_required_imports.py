@@ -26,15 +26,16 @@ This hook automatically applies the `# noqa: F401` comment to all import lines r
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 import click
 import libcst as cst
+from libcst import metadata
 from libcst._nodes.expression import BaseExpression
+from libcst._nodes.statement import SimpleStatementLine
 from libcst._nodes.whitespace import TrailingWhitespace
-from libcst.metadata import PositionProvider
 from typing_extensions import override
 from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
@@ -72,75 +73,138 @@ def _node_names(node: cst.Import) -> set[BaseExpression | str]:
     return {n.name.value for n in node.names}
 
 
-def _get_trailing(node: cst.Import | cst.ImportFrom) -> TrailingWhitespace:
-    """Type safe access of the trailing_whitespace attribute"""
-    return cast(cst.TrailingWhitespace, getattr(node, "trailing_whitespace"))  # noqa: B009
+_attrs = ()
+
+_T_Import = TypeVar("_T_Import", bound=cst.Import | cst.ImportFrom)
+
+_T_Stop = TypeVar("_T_Stop", bound=cst.CSTNode)
 
 
-def _is_missing_whitelist_comment(node: cst.Import | cst.ImportFrom) -> bool:
-    trailing = _get_trailing(node)
-    return not trailing.comment or _WHITELIST_COMMENT not in trailing.comment.value
+def _walk_back(
+    node: cst.CSTNode,
+    get_meta,
+    stop_type: type[_T_Stop],
+) -> _T_Stop | None:
+    cur = node
+    while True:
+        parent = get_meta(metadata.ParentNodeProvider, cur)
+        if parent is None:
+            return None
+        if isinstance(parent, stop_type):
+            return parent
+        cur = parent
 
 
-def _import_needs_whitelist(node: cst.Import, required_imports: frozenset[str]) -> bool:
+def _line_of(node: cst.CSTNode, get_meta) -> SimpleStatementLine | None:
+    return _walk_back(node, get_meta, cst.SimpleStatementLine)
+
+
+def _get_trailing(node: _T_Import, get_meta) -> TrailingWhitespace | None:
+    enclosing_line: SimpleStatementLine | None = _line_of(node, get_meta)
+    if enclosing_line is None:
+        return None
+    return enclosing_line.trailing_whitespace
+
+
+def _is_missing_whitelist_comment(node: _T_Import, get_meta) -> bool:
+    trailing = _get_trailing(node, get_meta)
+    return (
+        trailing is None
+        or not trailing.comment
+        or _WHITELIST_COMMENT not in trailing.comment.value
+    )
+
+
+def _import_needs_whitelist(
+    node: cst.Import, get_meta, required_imports: frozenset[str]
+) -> bool:
     return any(
         name in required_imports for name in _node_names(node)
-    ) and _is_missing_whitelist_comment(node)
+    ) and _is_missing_whitelist_comment(node, get_meta)
 
 
 def _importFrom_needs_whitelist(
-    node: cst.ImportFrom, required_imports: frozenset[str]
+    node: cst.ImportFrom, get_meta, required_imports: frozenset[str]
 ) -> bool:
-    if not isinstance(node.module, cst.Name):  # TODO: what case is this?
+    if not isinstance(node.module, cst.Name):
         return False
     modname = node.module.value
-    return modname in required_imports and _is_missing_whitelist_comment(node)
+    return modname in required_imports and _is_missing_whitelist_comment(node, get_meta)
 
 
-T = TypeVar("T", cst.Import, cst.ImportFrom)
+def _register_import(
+    node: cst.Import,
+    get_meta,
+    required_imports: frozenset[str],
+    register: Callable[[SimpleStatementLine | None], Any],
+) -> None:
+    """Mark an Import's enclosing simple line statement as needing a whitelist comment."""
+    if _import_needs_whitelist(node, get_meta, required_imports):
+        enclosure = _line_of(node, get_meta)
+        register(enclosure)
 
 
-def _append_comment(node: T, /) -> T:
-    new_trailing = _get_trailing(node).with_changes(
-        comment=cst.Comment(f" {_WHITELIST_COMMENT}")
-    )
-    return node.with_changes(trailing_whitespace=new_trailing)
+def _register_importFrom(
+    node: cst.ImportFrom,
+    get_meta,
+    required_imports: frozenset[str],
+    register: Callable[[SimpleStatementLine | None], Any],
+) -> None:
+    """Mark an ImportFrom's enclosing simple line statement as needing a whitelist comment."""
+    if _importFrom_needs_whitelist(node, get_meta, required_imports):
+        enclosure = _line_of(node, get_meta)
+        register(enclosure)
 
 
-class _NoqaTransformer(cst.CSTTransformer):
-    METADATA_DEPENDENCIES = (PositionProvider,)
+def _with_updated_trailing(node: SimpleStatementLine) -> SimpleStatementLine:
+    tw = node.trailing_whitespace
+    new_tw = tw.with_changes(comment=cst.Comment(f" {_WHITELIST_COMMENT}"))
+    return node.with_changes(trailing_whitespace=new_tw)
+
+
+class _AppendWhiteListComment(cst.CSTTransformer):
+    METADATA_DEPENDENCIES = (metadata.ParentNodeProvider,)
 
     def __init__(self, required_imports: frozenset[str]) -> None:
         self.required_imports: frozenset[str] = required_imports
         self.changed: bool = False
+        self._line_registry: set[int] = set()
         super().__init__()
 
+    def get_meta(self, provider, node):
+        return self.get_metadata(provider, node)
+
+    def register_line(self, line: SimpleStatementLine | None) -> None:
+        if line is not None:
+            return self._line_registry.add(id(line))
+
+    def line_needs_comment(self, line: SimpleStatementLine) -> bool:
+        return id(line) in self._line_registry
+
     @override
-    def leave_Import(
-        self, original_node: cst.Import, updated_node: cst.Import
-    ) -> cst.Import:
-        if not _import_needs_whitelist(updated_node, self.required_imports):
-            return updated_node
-
-        self.changed = True
-        return _append_comment(updated_node)
+    def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
+        _register_importFrom(
+            node, self.get_meta, self.required_imports, self.register_line
+        )
 
     @override
-    def leave_ImportFrom(
-        self, original_node: cst.ImportFrom, updated_node: cst.ImportFrom
-    ) -> cst.ImportFrom:
-        if not _importFrom_needs_whitelist(updated_node, self.required_imports):
-            return updated_node
+    def visit_Import(self, node: cst.Import) -> None:
+        _register_import(node, self.get_meta, self.required_imports, self.register_line)
 
-        self.changed = True
-        return _append_comment(updated_node)
+    @override
+    def leave_SimpleStatementLine(
+        self, original_node: SimpleStatementLine, updated_node: SimpleStatementLine
+    ):
+        if not self.line_needs_comment(original_node):
+            return updated_node
+        return _with_updated_trailing(updated_node)
 
 
 def _add_comments(
     mod: cst.Module, required_imports: frozenset[str]
 ) -> tuple[cst.Module, bool]:
     """Apply the # noqa: F401 comments to matching import lines."""
-    transformer = _NoqaTransformer(required_imports)
+    transformer = _AppendWhiteListComment(required_imports)
     new_mod = mod.visit(transformer)
     return new_mod, transformer.changed
 
