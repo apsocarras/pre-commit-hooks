@@ -35,7 +35,7 @@ def test_roundtrip_yaml(
     else:
         expected = expected_ahook_just_hooks_yaml
         hooks = load_hooks(expected.path)
-        res = PreCommitConfigYaml(repos=[RepoConfigBlock("local", hooks)])
+        res = PreCommitConfigYaml(repos=[RepoConfigBlock("local", hooks)])  # pyright: ignore[reportArgumentType]
         dump_config(
             res, (new := (Path(__file__).parent / "temp-hooks.yaml")), hooks_only
         )
