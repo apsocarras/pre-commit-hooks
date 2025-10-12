@@ -8,8 +8,6 @@ Run `export_hooks.py` to create a `.pre-commit-config.yaml` from the hooks in th
 
 from __future__ import annotations
 
-import importlib
-import sys
 import warnings
 
 from beartype.claw import beartype_this_package
@@ -22,7 +20,7 @@ from useful_types import (
 console = Console()
 
 
-def _rich_warning(message, category, filename, lineno, file=None, line=None):
+def _rich_warning(message, category, filename, lineno, file=None, line=None):  # type: ignore[no-untyped-def]
     console.print(f"[bold yellow]{category.__name__}[/bold yellow]: {message}")
 
 

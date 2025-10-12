@@ -23,7 +23,6 @@ def test_import_all_package_modules():
     def import_error(name: str) -> Exception | None:
         try:
             _ = importlib.import_module(name)
-            return None
         except Exception as e:
             return e
 

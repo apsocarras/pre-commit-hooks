@@ -1,19 +1,38 @@
+"""Model for an entry under the `repos` block in a `.pre-commit-config.yaml`"""
+
 from __future__ import annotations
 
 import importlib
 import logging
 import pkgutil
+from collections.abc import Callable
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import Any, Protocol, runtime_checkable
 
 import attr
 from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
-if TYPE_CHECKING:
-    from .hookConfigBlock import HookConfigBlock
+from .._types import GitStage
+from ..utils._nobeartype import nobeartype
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class HookConfigBlockProto(Protocol):
+    """Placeholder for RepoConfigBlock"""
+
+    id: str = attr.field()
+    name: str | None = attr.field(default=None)
+    language: str | None = attr.field(default=None)
+    entry: str | None = attr.field(default=None)
+    args: tuple[str, ...] | None = attr.field(default=None)
+    pass_filenames: bool | None = attr.field(default=None)
+    files: str | None = attr.field(default=None)
+    stages: tuple[GitStage, ...] | None = attr.field(default=None)
+    _repo: RepoConfigBlock
+    _funcs: set[Callable[..., Any]]
 
 
 @attr.define
@@ -21,15 +40,17 @@ class RepoConfigBlock:
     """Repo entry in .pre-commit-config.yaml."""
 
     repo: str
-    hooks: list[HookConfigBlock] = attr.field(factory=list)
+    hooks: list[HookConfigBlockProto] = attr.field(factory=list)
 
-    def add_hook(self, hook: HookConfigBlock, guard: bool = False) -> None:
+    @nobeartype
+    def add_hook(self, hook: HookConfigBlockProto, guard: bool = False) -> None:
         """Append a hook to the end of the hook list"""
         if guard and self.has_hook(hook):
             return
         self.hooks.append(hook)
 
-    def has_hook(self, hook: HookConfigBlock) -> bool:
+    @nobeartype
+    def has_hook(self, hook: HookConfigBlockProto) -> bool:
         """Checks if a hook of the same id is already in the hook list"""
         has_ = any(h.id == hook.id for h in self.hooks)
         logger.debug(msg=tuple(h.id for h in self.hooks))

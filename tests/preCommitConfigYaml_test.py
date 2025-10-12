@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks.utils.preCommitConfigYaml import (
+from ahooks.models import (
     HookConfigBlock,
     PreCommitConfigYaml,
     RepoConfigBlock,

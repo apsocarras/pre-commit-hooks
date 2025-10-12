@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "attrs>=25.3.0",
+    "beartype>=0.21.0",
     "cattrs>=25.2.0",
     "click>=8.1.8",
     "nobeartype>=0.1.1",
@@ -26,8 +27,6 @@ dev = [
     "ruff>=0.13.2",
 ]
 test = [
-    "ahooks",
-    "beartype>=0.21.0",
     "coverage>=7.10.7",
     "hypothesis>=6.140.3",
     "pytest>=8.4.2",
@@ -137,7 +136,7 @@ fixable = ["ALL"]
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S603", "D100", "D103"]
+"tests/*" = ["S101", "S603", "D100", "D103", "D101", "D104", "I002"]
 
 
 [tool.ruff.lint.isort]
@@ -155,3 +154,9 @@ ignore-decorators = [
 
 [tool.uv.sources]
 ahooks = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    ".",
+    ".",
+]

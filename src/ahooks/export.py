@@ -14,8 +14,8 @@ from useful_types import SequenceNotStr as Sequence
 from ._types import (
     HookChoice,
 )
+from .models.converters import dump_ahook_config
 from .utils._click_utils import WRITE_FILE_TYPE
-from .utils.preCommitConfigYaml import dump_ahook_config
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +71,16 @@ def export(
     config_path: Path | None = None,
     hooks_only: bool = False,
 ) -> None:
-    """Export the hooks in this package to a `pre-commit-config.yaml`
+    """Export the hooks in this package to a `pre-commit-config.yaml` (or `.pre-commit-hooks.yaml`)
 
     Arguments:
         hooks : tupel[str, ...], default = (,)
         Optionally specify which hooks in the package you want to export. If none provided, exports all hooks.
         config_path : Path, default = Path.cwd() / ".pre-commit-config.yaml"
         Path to the to the pre-commit config. If it exists, the hooks will be inserted into it.
+        hooks_only : bool, default = False
+        If true, outputs the `.pre-commit-hooks.yaml` instead of a full config
+
 
     """
     path_base: Callable[[Path], str] = (

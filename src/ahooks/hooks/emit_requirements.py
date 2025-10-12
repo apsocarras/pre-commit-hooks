@@ -22,7 +22,7 @@ from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
 )
 
-from ..utils import HookConfigBlock as cb
+from ..models.hookConfigBlock import HookConfigBlock as cb
 from ..utils._click_utils import (
     NotInstalledException,
     raise_if_return_code,

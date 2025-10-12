@@ -16,15 +16,18 @@ from cattrs.converters import Converter
 from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks._exceptions import PreCommitYamlValidationError
-from ahooks._types import FAILED_OP, FINISH_OP, HookChoice, OpSentinel
-
+from .._exceptions import PreCommitYamlValidationError
+from .._types import FAILED_OP, FINISH_OP, HookChoice, OpSentinel
 from ..utils._file_utils import write_atomic
 from ..utils._nobeartype import nobeartype
 from ..utils._yaml import yaml
-from .hookConfigBlock import HookConfigBlock
+from .hookConfigBlock import HookConfigBlock, RepoConfigBlockProto
 from .preCommitConfigYaml import PreCommitConfigYaml
-from .repoConfigBlock import RepoConfigBlock, get_module_precommit_repo
+from .repoConfigBlock import (
+    HookConfigBlockProto,
+    RepoConfigBlock,
+    get_module_precommit_repo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +66,15 @@ def _register_hooks(conv: cattrs.Converter) -> None:
     conv.register_unstructure_hook(tuple, list)
     conv.register_unstructure_hook(set, list)
 
-    for cls in (HookConfigBlock, RepoConfigBlock, PreCommitConfigYaml):
+    ## Have to register each of the protocols to defer to the actual types first
+    conv.register_structure_hook(
+        RepoConfigBlockProto, lambda val, _: conv.structure(val, RepoConfigBlock)
+    )
+    conv.register_structure_hook(
+        HookConfigBlockProto, lambda val, _: conv.structure(val, HookConfigBlock)
+    )
+
+    for cls in (RepoConfigBlock, HookConfigBlock, PreCommitConfigYaml):
         conv.register_unstructure_hook(cls, _omit_unstructurer(cls, conv))
         conv.register_structure_hook(cls, make_dict_structure_fn(cls, conv))
 
@@ -113,11 +124,12 @@ def load_hooks(path: Path) -> list[HookConfigBlock]:
         with path.open("r") as file:
             hooks = yaml.load(file)
         x: list[HookConfigBlock] = conv.structure(hooks, list[HookConfigBlock])
-        return x
     except cattrs.BaseValidationError as e:
         raise PreCommitYamlValidationError() from e
     except Exception:
         raise
+    else:
+        return x
 
 
 def get_ahook_config(*hook_choices: HookChoice) -> PreCommitConfigYaml:
@@ -148,7 +160,7 @@ def dump_ahook_config(
     else:
         # lazily reusing same functions by wrapping hooks inside config yaml
         user_hooks = load_hooks(path)
-        user_repo = RepoConfigBlock("local", user_hooks)
+        user_repo = RepoConfigBlock("local", user_hooks)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
         user_config = PreCommitConfigYaml(repos=[user_repo])
 
     append_result: OpSentinel = user_config.extend(repo_block=module_config.repos[0])

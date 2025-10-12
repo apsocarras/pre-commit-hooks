@@ -1,4 +1,4 @@
-"""Decorator for attaching default `.pre-commit-config.yaml` configurations to hooks"""
+"""Schema for `.pre-commit-config.yaml` file"""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ import attr
 from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
-from ahooks.models.hookConfigBlock import HookConfigBlock
-
 from .._types import (
     FAILED_OP,
     FINISH_OP,
     OpSentinel,
 )
+from ..models.hookConfigBlock import HookConfigBlock
 from .repoConfigBlock import RepoConfigBlock
 
 logger = logging.getLogger(__name__)
@@ -74,7 +73,7 @@ class PreCommitConfigYaml:
         - If the same name exists, adds to it
         - Else, adds another block at the end of the yaml
         """
-        return self.extend(RepoConfigBlock(repo_name, list(hooks)))
+        return self.extend(RepoConfigBlock(repo_name, list(hooks)))  # type: ignore[arg-type] # pyright: ignore[reportArgumentType]
 
     @override
     def __eq__(self, o: object) -> bool:

@@ -23,7 +23,7 @@ import click
 from useful_types import SequenceNotStr as Sequence
 
 from .._types import NodeLoc
-from ..utils import HookConfigBlock as cb
+from ..models.hookConfigBlock import HookConfigBlock as cb
 from ..utils._click_utils import READ_DIR_TYPE, stage_if_true
 from ..utils.git_utils import (
     iter_py_filtered,
