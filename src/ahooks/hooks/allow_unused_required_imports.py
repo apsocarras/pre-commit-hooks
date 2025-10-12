@@ -41,14 +41,13 @@ from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
 )
 
-from ahooks.utils._file_utils import write_atomic
-
 from ..models import HookConfigBlock as cb
 from ..utils._click_utils import (
     READ_FILE_TYPE,
     NoRequiredImportsException,
     stage_if_true,
 )
+from ..utils._file_utils import write_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -73,21 +72,23 @@ def _node_names(node: cst.Import) -> set[BaseExpression | str]:
     return {n.name.value for n in node.names}
 
 
-_attrs = ()
-
 _T_Import = TypeVar("_T_Import", bound=cst.Import | cst.ImportFrom)
 
 _T_Stop = TypeVar("_T_Stop", bound=cst.CSTNode)
 
+P = ParamSpec("P")
+
+ParentNodeFinder = Callable[..., cst.CSTNode | Any]
+
 
 def _walk_back(
     node: cst.CSTNode,
-    get_meta,
+    get_parent: ParentNodeFinder,
     stop_type: type[_T_Stop],
 ) -> _T_Stop | None:
     cur = node
     while True:
-        parent = get_meta(metadata.ParentNodeProvider, cur)
+        parent = get_parent(cur)
         if parent is None:
             return None
         if isinstance(parent, stop_type):
@@ -95,18 +96,19 @@ def _walk_back(
         cur = parent
 
 
-def _line_of(node: cst.CSTNode, get_meta) -> SimpleStatementLine | None:
-    return _walk_back(node, get_meta, cst.SimpleStatementLine)
+def _line_of(
+    node: cst.CSTNode, get_parent: ParentNodeFinder
+) -> SimpleStatementLine | None:
+    return _walk_back(node, get_parent, cst.SimpleStatementLine)
 
 
-P = ParamSpec("P")
 WhiteSpaceFinder = Callable[P, TrailingWhitespace | None]
 
 
 def _get_trailing(
-    node: cst.Import | cst.ImportFrom, get_meta
+    node: cst.CSTNode, get_parent: ParentNodeFinder
 ) -> TrailingWhitespace | None:
-    enclosing_line: SimpleStatementLine | None = _line_of(node, get_meta)
+    enclosing_line: SimpleStatementLine | None = _line_of(node, get_parent)
     if enclosing_line is None:
         return None
     return enclosing_line.trailing_whitespace
@@ -122,6 +124,9 @@ def _is_missing_whitelist_comment(
         or not trailing.comment
         or _WHITELIST_COMMENT not in trailing.comment.value
     )
+
+
+NeedsWhitelistChecker = Callable[[_T_Import], bool]
 
 
 def _import_needs_whitelist(
@@ -147,28 +152,43 @@ def _importFrom_needs_whitelist(
     )
 
 
+def _register_import_type(
+    node: _T_Import,
+    needs_whitelist: NeedsWhitelistChecker[_T_Import],
+    get_parent: ParentNodeFinder,
+    register: Callable[[SimpleStatementLine | None], Any],
+) -> None:
+    if needs_whitelist(node):
+        enclosure = _line_of(node, get_parent)
+        register(enclosure)
+
+
 def _register_import(
     node: cst.Import,
     get_trailing: WhiteSpaceFinder[cst.Import],
+    get_parent: ParentNodeFinder,
     required_imports: frozenset[str],
     register: Callable[[SimpleStatementLine | None], Any],
 ) -> None:
     """Mark an Import's enclosing simple line statement as needing a whitelist comment."""
-    if _import_needs_whitelist(node, get_trailing, required_imports):
-        enclosure = _line_of(node, get_meta)
-        register(enclosure)
+    needs_whitelist: Callable[[cst.Import], bool] = (
+        lambda node: _import_needs_whitelist(node, get_trailing, required_imports)
+    )
+    _register_import_type(node, needs_whitelist, get_parent, register)
 
 
 def _register_importFrom(
     node: cst.ImportFrom,
     get_trailing: WhiteSpaceFinder[cst.ImportFrom],
+    get_parent: ParentNodeFinder,
     required_imports: frozenset[str],
     register: Callable[[SimpleStatementLine | None], Any],
 ) -> None:
     """Mark an ImportFrom's enclosing simple line statement as needing a whitelist comment."""
-    if _importFrom_needs_whitelist(node, get_trailing, required_imports):
-        enclosure = _line_of(node, get_meta)
-        register(enclosure)
+    needs_whitelist: Callable[[cst.ImportFrom], bool] = (
+        lambda node: _importFrom_needs_whitelist(node, get_trailing, required_imports)
+    )
+    _register_import_type(node, needs_whitelist, get_parent, register)
 
 
 def _with_updated_trailing(node: SimpleStatementLine) -> SimpleStatementLine:
@@ -186,11 +206,11 @@ class _AppendWhiteListComment(cst.CSTTransformer):
         self._line_registry: set[int] = set()
         super().__init__()
 
-    def get_meta(self, provider, node):
+    def get_parent(self, provider, node):  # type: ignore[no-untyped-def]
         return self.get_metadata(provider, node)
 
-    def get_trailing(self, node) -> TrailingWhitespace | None:
-        return _get_trailing(node, self.get_meta)
+    def get_trailing(self, node: cst.CSTNode) -> TrailingWhitespace | None:
+        return _get_trailing(node, self.get_parent)
 
     def register_line(self, line: SimpleStatementLine | None) -> None:
         if line is not None:
@@ -202,19 +222,27 @@ class _AppendWhiteListComment(cst.CSTTransformer):
     @override
     def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
         _register_importFrom(
-            node, self.get_trailing, self.required_imports, self.register_line
+            node,
+            self.get_trailing,
+            self.get_parent,
+            self.required_imports,
+            self.register_line,
         )
 
     @override
     def visit_Import(self, node: cst.Import) -> None:
         _register_import(
-            node, self.get_trailing, self.required_imports, self.register_line
+            node,
+            self.get_trailing,
+            self.get_parent,
+            self.required_imports,
+            self.register_line,
         )
 
     @override
     def leave_SimpleStatementLine(
         self, original_node: SimpleStatementLine, updated_node: SimpleStatementLine
-    ):
+    ) -> SimpleStatementLine:
         if not self.line_needs_comment(original_node):
             return updated_node
         return _with_updated_trailing(updated_node)
