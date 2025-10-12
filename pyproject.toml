@@ -9,6 +9,7 @@ dependencies = [
     "beartype>=0.21.0",
     "cattrs>=25.2.0",
     "click>=8.1.8",
+    "libcst>=1.8.5",
     "nobeartype>=0.1.1",
     "rich>=14.2.0",
     "ruamel-yaml>=0.18.15",
