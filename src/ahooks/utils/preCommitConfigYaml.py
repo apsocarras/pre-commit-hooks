@@ -19,7 +19,6 @@ from ruamel.yaml import YAML
 from typing_extensions import override
 from useful_types import SequenceNotStr as Sequence
 
-from ...ahooks import nobeartype
 from .._exceptions import PreCommitYamlValidationError
 from .._types import (
     FAILED_OP,
@@ -31,6 +30,7 @@ from .._types import (
     R,
 )
 from ..utils._file_utils import write_atomic
+from ._nobeartype import nobeartype
 
 logger = logging.getLogger(__name__)
 
