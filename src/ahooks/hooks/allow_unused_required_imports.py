@@ -28,11 +28,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, ParamSpec, TypeVar
+from typing import Annotated, Any, ParamSpec, TypeVar
 
 import click
 import libcst as cst
 from libcst import metadata
+from libcst._nodes.base import CSTNode
 from libcst._nodes.expression import BaseExpression
 from libcst._nodes.statement import SimpleStatementLine
 from libcst._nodes.whitespace import TrailingWhitespace
@@ -78,7 +79,10 @@ _T_Stop = TypeVar("_T_Stop", bound=cst.CSTNode)
 
 P = ParamSpec("P")
 
-ParentNodeFinder = Callable[..., cst.CSTNode | Any]
+ParentNodeFinder = Callable[
+    [cst.CSTNode],
+    cst.CSTNode | None,
+]
 
 
 def _walk_back(
@@ -88,7 +92,7 @@ def _walk_back(
 ) -> _T_Stop | None:
     cur = node
     while True:
-        parent = get_parent(cur)
+        parent: CSTNode | None = get_parent(cur)
         if parent is None:
             return None
         if isinstance(parent, stop_type):
@@ -206,8 +210,13 @@ class _AppendWhiteListComment(cst.CSTTransformer):
         self._line_registry: set[int] = set()
         super().__init__()
 
-    def get_parent(self, provider, node):  # type: ignore[no-untyped-def]
-        return self.get_metadata(provider, node)
+    def get_parent(self, node: cst.CSTNode) -> CSTNode | None:
+        res: Annotated[
+            CSTNode | Any, "libcst has a private _UNDEFINED_DEFAULT singleton"
+        ] = self.get_metadata(metadata.ParentNodeProvider, node)
+        if not isinstance(res, CSTNode):
+            return None
+        return res
 
     def get_trailing(self, node: cst.CSTNode) -> TrailingWhitespace | None:
         return _get_trailing(node, self.get_parent)
