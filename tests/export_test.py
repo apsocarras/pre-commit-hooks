@@ -21,7 +21,7 @@ from useful_types import SequenceNotStr as Sequence
 
 from ahooks._types import HookChoice
 from ahooks.export import export
-from ahooks.utils.preCommitConfigYaml import (
+from ahooks.models import (
     HookConfigBlock,
     PreCommitConfigYaml,
     get_ahook_config,
@@ -59,7 +59,7 @@ def _check(output: Path, expected: PreCommitConfigYaml, hooks_only: bool) -> Non
         assert output.name == ".pre-commit-config.yaml"  # ensure expected test behavior
         hooks_path = output.parent / ".pre-commit-hooks.yaml"
         loaded_output_hooks = load_hooks(hooks_path)
-        _check_hooks_vs_expected(loaded_output_hooks, expected.repos[0].hooks)
+        _check_hooks_vs_expected(loaded_output_hooks, expected.repos[0].hooks)  # pyright: ignore[reportArgumentType]
 
 
 class _CallExportKwargs(TypedDict, total=False):

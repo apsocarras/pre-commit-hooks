@@ -4,8 +4,8 @@ import pytest
 from useful_types import SequenceNotStr as Sequence
 
 from ahooks._types import HookChoice
-from ahooks.utils import HookConfigBlock as hb
-from ahooks.utils import RepoConfigBlock as r
+from ahooks.models import HookConfigBlock as hb
+from ahooks.models import RepoConfigBlock as r
 
 
 def test_hook_decorator_registry():
@@ -42,7 +42,7 @@ def test_hook_decorator_registry():
 def test_module_repo_has_hook_decorators(
     hooks: HookChoice | tuple[HookChoice, ...] | None,
 ):
-    from ahooks.utils.preCommitConfigYaml import get_ahook_config
+    from ahooks.models import get_ahook_config
 
     match hooks:
         case str():

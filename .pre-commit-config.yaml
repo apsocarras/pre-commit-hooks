@@ -7,7 +7,15 @@ repos:
         name: Export .pre-commit-hooks.yaml
         language: system
         entry: python -m ahooks.export
-        args: ["-h"]
+        args: [-h]
         pass_filenames: false
         files: ^hooks/.*\.py$
         stages: [pre-commit, pre-push]
+      - id: emit-requirements
+        name: Emit requirements.txt from pyproject.toml using `uv`
+        language: system
+        entry: python -m ahooks.emit_requirements
+        pass_filenames: false
+        files: ^(pyproject\.toml|requirements\.txt)$
+        stages: [pre-commit, pre-push]
+...

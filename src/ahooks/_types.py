@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from typing import Literal, NamedTuple, TypeAlias, TypeVar, Union
+from typing import (
+    Literal,
+    NamedTuple,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 from typing_extensions import NotRequired, ParamSpec, Sentinel, TypedDict
 from useful_types import SequenceNotStr as Sequence
