@@ -27,6 +27,12 @@ class SubprocessReturnCodeException(click.ClickException):
         )
 
 
+class NoRequiredImportsException(click.ClickException):
+    def __init__(self) -> None:
+        message = "No required-imports block found in pyproject.toml"
+        super().__init__(message)
+
+
 def raise_if_return_code(command_name: str, result: CompletedProcess[str]) -> None:
     if result.returncode != 0:
         raise SubprocessReturnCodeException(command_name, result)
