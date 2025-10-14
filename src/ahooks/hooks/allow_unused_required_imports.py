@@ -28,16 +28,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Annotated, Any, ParamSpec, TypeVar
+from typing import Annotated, Any, NamedTuple, ParamSpec, TypeAlias, TypeVar, cast
 
 import click
 import libcst as cst
-from libcst import metadata
+from libcst import ImportStar, matchers, metadata
 from libcst._nodes.base import CSTNode
 from libcst._nodes.expression import BaseExpression
 from libcst._nodes.statement import SimpleStatementLine
 from libcst._nodes.whitespace import TrailingWhitespace
-from typing_extensions import override
+from typing_extensions import Self, override
 from useful_types import (
     SequenceNotStr as Sequence,  # pyright: ignore[reportUnusedImport]
 )
@@ -143,56 +143,124 @@ def _import_needs_whitelist(
     ) and _is_missing_whitelist_comment(node, get_trailing)
 
 
+_T_ImportType = TypeVar("_T_ImportType", cst.Import, cst.ImportFrom)
+
+
+def _find_matches_raw(
+    mod: cst.Module, t: type[_T_ImportType]
+) -> tuple[_T_ImportType, ...]:
+    if t is cst.Import:
+        return cast(
+            tuple[_T_ImportType, ...],
+            tuple(matchers.findall(mod, matchers.Import())),
+        )
+    else:
+        return cast(
+            tuple[_T_ImportType, ...],
+            tuple(matchers.findall(mod, matchers.ImportFrom())),
+        )
+
+
+def _find_matches_simple_statements(
+    mod: cst.Module, t: type[_T_ImportType]
+) -> tuple[cst.SimpleStatementLine, ...]:
+    get_matches = lambda body: matchers.findall(
+        mod, matchers.SimpleStatementLine(body=body)
+    )
+    if t is cst.Import:
+        body = [matchers.Import()]
+        return cast(tuple[cst.SimpleStatementLine, ...], tuple(get_matches(body)))
+    else:
+        body = [matchers.ImportFrom()]
+        return cast(tuple[cst.SimpleStatementLine, ...], tuple(get_matches(body)))
+
+
+class _ImportNameAndAlias(NamedTuple):
+    name: str
+    as_name: str | None
+
+    @staticmethod
+    def underlying(d: cst.ImportAlias, /) -> str:
+        return d.name.value if isinstance(d.name, cst.Name) else d.name.attr.value
+
+    @staticmethod
+    def get_name(d: cst.ImportAlias, /) -> str:
+        return d.name.value if isinstance(d.name, cst.Name) else d.name.attr.value
+
+    @staticmethod
+    def get_asname(d: cst.ImportAlias, /) -> str | None:
+        if d.asname is None:
+            return None
+        as_name = d.asname.name
+        if isinstance(as_name, cst.Name):
+            return as_name.value
+        raise RuntimeError(as_name)  # FIXME
+
+    @classmethod
+    def from_alias(cls, d: cst.ImportAlias, /) -> Self:
+        name = cls.get_name(d)
+        as_name = cls.get_asname(d)
+        return cls(name, as_name)
+
+
+_I: TypeAlias = _ImportNameAndAlias
+
+
+class _ModuleAndNames(NamedTuple):
+    module: str
+    names: tuple[_ImportNameAndAlias, ...]
+
+
+def _importFrom_key(
+    node: cst.ImportFrom,
+) -> _ModuleAndNames:
+    def _iter_str_parts(mod: cst.BaseExpression | None) -> Iterable[str]:
+        if mod is None:
+            yield ""
+        elif isinstance(mod, cst.Name):
+            yield mod.value
+        else:
+            cur = mod
+            while isinstance(cur, cst.Attribute):
+                yield cur.attr.value
+                cur = cur.value
+            if isinstance(cur, cst.Name):
+                yield cur.value
+
+    module_name = ".".join(_iter_str_parts(node.module))
+    if isinstance(node.names, ImportStar):
+        names = (_I("*", None),)
+    else:
+        names = tuple(sorted(_I.from_alias(a) for a in node.names))
+    return _ModuleAndNames(module_name, names)
+
+
+def _parse_required_importfrom_keys(
+    required_imports: frozenset[str],
+) -> set[_ModuleAndNames]:
+    """Create nornalized comparison keys for importFrom nodes that will work across module trees"""
+
+    def _iter_importFrom_keys(req: str):
+        mod = cst.parse_module(req if req.endswith("\n") else req + "\n")
+        for ssl in _find_matches_simple_statements(mod, cst.ImportFrom):
+            # SimpleStatement is not generic over its contents -- the finder function guarantees
+            # the body is ImportFrom but this isn't visible to the type checker
+            body = cast(cst.ImportFrom, ssl.body[0])
+            yield _importFrom_key(body)
+
+    return {key for req in required_imports for key in _iter_importFrom_keys(req)}
+
+
 def _importFrom_needs_whitelist(
     node: cst.ImportFrom,
     get_trailing: WhiteSpaceFinder[cst.ImportFrom],
     required_imports: frozenset[str],
 ) -> bool:
-    if not isinstance(node.module, cst.Name):
-        return False
-    modname = node.module.value
-    return modname in required_imports and _is_missing_whitelist_comment(
+    required_keys = _parse_required_importfrom_keys(required_imports)
+    node_key = _importFrom_key(node)
+    return node_key in required_keys and _is_missing_whitelist_comment(
         node, get_trailing
     )
-
-
-def _register_import_type(
-    node: _T_Import,
-    needs_whitelist: NeedsWhitelistChecker[_T_Import],
-    get_parent: ParentNodeFinder,
-    register: Callable[[SimpleStatementLine | None], Any],
-) -> None:
-    if needs_whitelist(node):
-        enclosure = _line_of(node, get_parent)
-        register(enclosure)
-
-
-def _register_import(
-    node: cst.Import,
-    get_trailing: WhiteSpaceFinder[cst.Import],
-    get_parent: ParentNodeFinder,
-    required_imports: frozenset[str],
-    register: Callable[[SimpleStatementLine | None], Any],
-) -> None:
-    """Mark an Import's enclosing simple line statement as needing a whitelist comment."""
-    needs_whitelist: Callable[[cst.Import], bool] = (
-        lambda node: _import_needs_whitelist(node, get_trailing, required_imports)
-    )
-    _register_import_type(node, needs_whitelist, get_parent, register)
-
-
-def _register_importFrom(
-    node: cst.ImportFrom,
-    get_trailing: WhiteSpaceFinder[cst.ImportFrom],
-    get_parent: ParentNodeFinder,
-    required_imports: frozenset[str],
-    register: Callable[[SimpleStatementLine | None], Any],
-) -> None:
-    """Mark an ImportFrom's enclosing simple line statement as needing a whitelist comment."""
-    needs_whitelist: Callable[[cst.ImportFrom], bool] = (
-        lambda node: _importFrom_needs_whitelist(node, get_trailing, required_imports)
-    )
-    _register_import_type(node, needs_whitelist, get_parent, register)
 
 
 def _with_updated_trailing(node: SimpleStatementLine) -> SimpleStatementLine:
@@ -209,6 +277,50 @@ class _AppendWhiteListComment(cst.CSTTransformer):
         self.changed: bool = False
         self._line_registry: set[int] = set()
         super().__init__()
+
+    @classmethod
+    def _register_import_type(
+        cls,
+        node: _T_Import,
+        needs_whitelist: NeedsWhitelistChecker[_T_Import],
+        get_parent: ParentNodeFinder,
+        register: Callable[[SimpleStatementLine | None], Any],
+    ) -> None:
+        if needs_whitelist(node):
+            enclosure = _line_of(node, get_parent)
+            register(enclosure)
+
+    @classmethod
+    def _register_import(
+        cls,
+        node: cst.Import,
+        get_trailing: WhiteSpaceFinder[cst.Import],
+        get_parent: ParentNodeFinder,
+        required_imports: frozenset[str],
+        register: Callable[[SimpleStatementLine | None], Any],
+    ) -> None:
+        """Mark an Import's enclosing simple line statement as needing a whitelist comment."""
+        needs_whitelist: Callable[[cst.Import], bool] = (
+            lambda node: _import_needs_whitelist(node, get_trailing, required_imports)
+        )
+        cls._register_import_type(node, needs_whitelist, get_parent, register)
+
+    @classmethod
+    def _register_importFrom(
+        cls,
+        node: cst.ImportFrom,
+        get_trailing: WhiteSpaceFinder[cst.ImportFrom],
+        get_parent: ParentNodeFinder,
+        required_imports: frozenset[str],
+        register: Callable[[SimpleStatementLine | None], Any],
+    ) -> None:
+        """Mark an ImportFrom's enclosing simple line statement as needing a whitelist comment."""
+        needs_whitelist: Callable[[cst.ImportFrom], bool] = (
+            lambda node: _importFrom_needs_whitelist(
+                node, get_trailing, required_imports
+            )
+        )
+        cls._register_import_type(node, needs_whitelist, get_parent, register)
 
     def get_parent(self, node: cst.CSTNode) -> CSTNode | None:
         res: Annotated[
@@ -230,7 +342,7 @@ class _AppendWhiteListComment(cst.CSTTransformer):
 
     @override
     def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
-        _register_importFrom(
+        self._register_importFrom(
             node,
             self.get_trailing,
             self.get_parent,
@@ -240,7 +352,7 @@ class _AppendWhiteListComment(cst.CSTTransformer):
 
     @override
     def visit_Import(self, node: cst.Import) -> None:
-        _register_import(
+        self._register_import(
             node,
             self.get_trailing,
             self.get_parent,

@@ -4,11 +4,11 @@ import os
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, NamedTuple, TypeVar, cast
+from typing import Literal, NamedTuple
 
 import libcst as cst
 import pytest
-from libcst import MetadataWrapper, SimpleStatementLine, matchers, metadata
+from libcst import MetadataWrapper, SimpleStatementLine, metadata
 from libcst._nodes.base import CSTNode
 from libcst._nodes.statement import Import, ImportFrom, SimpleStatementLine
 from libcst.metadata.parent_node_provider import ParentNodeProvider
@@ -16,6 +16,8 @@ from typing_extensions import Any, override
 
 from ahooks.hooks.allow_unused_required_imports import (
     _WHITELIST_COMMENT,
+    _add_comments,
+    _find_matches_raw,
     _get_required_import_statements,
     _import_needs_whitelist,
     _importFrom_needs_whitelist,
@@ -151,6 +153,17 @@ def test_import_needs_whitelist(
             frozenset({"something"}),
             False,
         ),
+        (
+            "MAIN_USE_CASE",
+            "from useful_types import SequenceNotStr as Sequence",
+            frozenset(
+                (
+                    "from __future__ import annotations",
+                    "from useful_types import SequenceNotStr as Sequence",
+                )
+            ),
+            True,
+        ),
     ),
 )
 def test_importFrom_needs_whitelist(
@@ -229,6 +242,7 @@ def example_pyproject(tmpdir: Path) -> PyProject:
 class PyModule(NamedTuple):
     raw: str
     processed: str
+    required_imports: frozenset[str]
 
 
 @pytest.fixture
@@ -270,8 +284,13 @@ def example_pymodule() -> PyModule:
     if __name__ == "__main__":
         foo()
     """)
-
-    return PyModule(raw, processed)
+    reqs = frozenset(
+        (
+            "from __future__ import annotations",
+            "from useful_types import SequenceNotStr as Sequence # noqa: F401",
+        )
+    )
+    return PyModule(raw, processed, reqs)
 
 
 def test_get_required_imports(example_pyproject: PyProject) -> None:
@@ -349,38 +368,6 @@ class ParentVisitor(cst.CSTVisitor):
         return None
 
 
-_T_ImportType = TypeVar("_T_ImportType", cst.Import, cst.ImportFrom)
-
-
-def _find_matches_simple_statements(
-    mod: cst.Module, t: type[_T_ImportType]
-) -> tuple[matchers.SimpleStatementLine, ...]:
-    get_matches = lambda body: matchers.findall(
-        mod, matchers.SimpleStatementLine(body=body)
-    )
-    if t is cst.Import:
-        body = [matchers.Import()]
-        return cast(tuple[matchers.SimpleStatementLine, ...], tuple(get_matches(body)))
-    else:
-        body = [matchers.ImportFrom()]
-        return cast(tuple[matchers.SimpleStatementLine, ...], tuple(get_matches(body)))
-
-
-def _find_matches_raw(
-    mod: cst.Module, t: type[_T_ImportType]
-) -> tuple[_T_ImportType, ...]:
-    if t is cst.Import:
-        return cast(
-            tuple[_T_ImportType, ...],
-            tuple(matchers.findall(mod, matchers.Import())),
-        )
-    else:
-        return cast(
-            tuple[_T_ImportType, ...],
-            tuple(matchers.findall(mod, matchers.ImportFrom())),
-        )
-
-
 @pytest.mark.parametrize("node_type", ("IMPORT_FROM", "IMPORT"))
 def test_walk_back_finds_enclosing_lines(
     example_pymodule: PyModule, node_type: Literal["IMPORT_FROM", "IMPORT"]
@@ -402,3 +389,11 @@ def test_walk_back_finds_enclosing_lines(
     assert not missing_nodes, len(matches) - len(missing_nodes)
     nodes_missing_lines = tuple(node for node in matches if not visitor.get_line(node))
     assert not nodes_missing_lines, len(matches) - len(nodes_missing_lines)
+
+
+def test_add_comment(example_pymodule: PyModule):
+    mod = cst.parse_module(example_pymodule.raw)
+    _new_mod, changed = _add_comments(
+        mod, required_imports=example_pymodule.required_imports
+    )
+    assert changed
