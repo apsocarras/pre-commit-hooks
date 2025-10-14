@@ -197,7 +197,7 @@ def _register_importFrom(
 
 def _with_updated_trailing(node: SimpleStatementLine) -> SimpleStatementLine:
     tw = node.trailing_whitespace
-    new_tw = tw.with_changes(comment=cst.Comment(f" {_WHITELIST_COMMENT}"))
+    new_tw = tw.with_changes(comment=cst.Comment(f"{_WHITELIST_COMMENT}"))
     return node.with_changes(trailing_whitespace=new_tw)
 
 
